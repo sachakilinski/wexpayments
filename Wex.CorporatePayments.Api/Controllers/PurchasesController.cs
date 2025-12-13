@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Wex.CorporatePayments.Application.Commands;
 using Wex.CorporatePayments.Application.Exceptions;
 using Wex.CorporatePayments.Application.UseCases;
+using FluentValidation;
 
 namespace Wex.CorporatePayments.Api.Controllers;
 
@@ -23,6 +24,22 @@ public class PurchasesController : ControllerBase
         {
             var purchaseId = await _storePurchaseTransactionUseCase.HandleAsync(command, cancellationToken);
             return CreatedAtAction(nameof(GetPurchase), new { id = purchaseId }, new { Id = purchaseId });
+        }
+        catch (ValidationException ex)
+        {
+            // Return 400 Bad Request with validation errors
+            var errors = ex.Errors.Select(e => new 
+            {
+                Property = e.PropertyName,
+                ErrorMessage = e.ErrorMessage,
+                AttemptedValue = e.AttemptedValue
+            });
+            
+            return BadRequest(new { 
+                Error = "Validation failed",
+                Code = "VALIDATION_ERROR",
+                Errors = errors
+            });
         }
         catch (IdempotencyConflictException ex)
         {

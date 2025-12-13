@@ -2,10 +2,12 @@ using Microsoft.EntityFrameworkCore;
 using Wex.CorporatePayments.Application.Interfaces;
 using Wex.CorporatePayments.Application.UseCases;
 using Wex.CorporatePayments.Application.Validators;
+using Wex.CorporatePayments.Application.Behaviors;
 using Wex.CorporatePayments.Infrastructure.Data;
 using Wex.CorporatePayments.Infrastructure.Repositories;
 using FluentValidation;
 using FluentValidation.AspNetCore;
+using MediatR;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -25,6 +27,9 @@ builder.Services.AddScoped<IPurchaseRepository, PurchaseRepository>();
 
 // Register use cases
 builder.Services.AddScoped<IStorePurchaseTransactionUseCase, StorePurchaseTransactionUseCase>();
+
+// Add MediatR
+builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(StorePurchaseTransactionUseCase).Assembly));
 
 // Add FluentValidation
 builder.Services.AddValidatorsFromAssemblyContaining<StorePurchaseCommandValidator>();
