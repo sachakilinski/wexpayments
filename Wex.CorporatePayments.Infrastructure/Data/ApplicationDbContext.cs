@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Wex.CorporatePayments.Domain.Entities;
+using Wex.CorporatePayments.Domain.ValueObjects;
 
 namespace Wex.CorporatePayments.Infrastructure.Data;
 
@@ -24,8 +25,18 @@ public class ApplicationDbContext : DbContext
                 .IsRequired()
                 .HasMaxLength(50);
             
-            entity.Property(e => e.Amount)
-                .HasPrecision(18, 2); // Financial precision
+            // Configure Money Value Object as owned entity
+            entity.OwnsOne(e => e.OriginalAmount, money =>
+            {
+                money.Property(m => m.Amount)
+                    .HasPrecision(18, 2) // Financial precision
+                    .HasColumnName("OriginalAmount");
+                
+                money.Property(m => m.Currency)
+                    .IsRequired()
+                    .HasMaxLength(3)
+                    .HasColumnName("OriginalCurrency");
+            });
             
             entity.Property(e => e.IdempotencyKey)
                 .HasMaxLength(255);
