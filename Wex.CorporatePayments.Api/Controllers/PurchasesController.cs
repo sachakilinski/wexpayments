@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Wex.CorporatePayments.Application.Commands;
+using Wex.CorporatePayments.Application.Exceptions;
 using Wex.CorporatePayments.Application.UseCases;
 
 namespace Wex.CorporatePayments.Api.Controllers;
@@ -22,6 +23,15 @@ public class PurchasesController : ControllerBase
         {
             var purchaseId = await _storePurchaseTransactionUseCase.HandleAsync(command, cancellationToken);
             return CreatedAtAction(nameof(GetPurchase), new { id = purchaseId }, new { Id = purchaseId });
+        }
+        catch (IdempotencyConflictException ex)
+        {
+            // Return 409 Conflict for duplicate idempotency key
+            return Conflict(new { 
+                Error = ex.Message, 
+                IdempotencyKey = ex.IdempotencyKey,
+                Code = "IDEMPOTENCY_CONFLICT"
+            });
         }
         catch (Exception ex)
         {

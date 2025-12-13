@@ -1,4 +1,6 @@
+using Microsoft.EntityFrameworkCore;
 using Wex.CorporatePayments.Application.Commands;
+using Wex.CorporatePayments.Application.Exceptions;
 using Wex.CorporatePayments.Application.Interfaces;
 using Wex.CorporatePayments.Domain.Entities;
 
@@ -33,9 +35,37 @@ public class StorePurchaseTransactionUseCase : IStorePurchaseTransactionUseCase
             command.IdempotencyKey
         );
 
-        // Persist the purchase
-        await _purchaseRepository.AddAsync(purchase, cancellationToken);
+        try
+        {
+            // Persist the purchase
+            await _purchaseRepository.AddAsync(purchase, cancellationToken);
+        }
+        catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
+        {
+            // Handle unique constraint violation on IdempotencyKey
+            throw new IdempotencyConflictException(command.IdempotencyKey, ex);
+        }
 
         return purchase.Id;
+    }
+
+    private static bool IsUniqueConstraintViolation(DbUpdateException ex)
+    {
+        // Check for SQLite unique constraint violation
+        var innerException = ex.InnerException;
+        
+        // SQLite unique constraint violation error codes
+        if (innerException is Microsoft.Data.Sqlite.SqliteException sqliteEx)
+        {
+            // SQLite error code 19 = constraint violation
+            // SQLite error code 2067 = UNIQUE constraint failed
+            return sqliteEx.SqliteErrorCode == 19 || sqliteEx.SqliteErrorCode == 2067;
+        }
+
+        // Generic check for constraint violation messages
+        var message = innerException?.Message?.ToLowerInvariant();
+        return message?.Contains("unique") == true || 
+               message?.Contains("constraint") == true ||
+               message?.Contains("idempotency") == true;
     }
 }
