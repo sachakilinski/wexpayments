@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using MediatR;
 using Wex.CorporatePayments.Application.Commands;
+using Wex.CorporatePayments.Application.Configuration;
 using Wex.CorporatePayments.Application.Exceptions;
 using Wex.CorporatePayments.Application.Queries;
 using Wex.CorporatePayments.Application.UseCases;
@@ -43,7 +44,7 @@ public class PurchasesController : ControllerBase
             
             return BadRequest(new { 
                 Error = "Validation failed",
-                Code = "VALIDATION_ERROR",
+                Code = ApplicationConstants.ErrorCodes.ValidationFailed,
                 Errors = errors
             });
         }
@@ -53,7 +54,7 @@ public class PurchasesController : ControllerBase
             return Conflict(new { 
                 Error = ex.Message, 
                 IdempotencyKey = ex.IdempotencyKey,
-                Code = "IDEMPOTENCY_CONFLICT"
+                Code = ApplicationConstants.ErrorCodes.IdempotencyConflict
             });
         }
         catch (Exception ex)
@@ -63,7 +64,7 @@ public class PurchasesController : ControllerBase
     }
 
     [HttpGet("{id:guid}")]
-    public async Task<IActionResult> GetPurchase(Guid id, [FromQuery] string currency = "BRL", CancellationToken cancellationToken = default)
+    public async Task<IActionResult> GetPurchase(Guid id, [FromQuery] string currency = ApplicationConstants.Currency.Default, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -91,15 +92,15 @@ public class PurchasesController : ControllerBase
         }
         catch (KeyNotFoundException ex)
         {
-            return NotFound(new { Error = ex.Message, Code = "PURCHASE_NOT_FOUND" });
+            return NotFound(new { Error = ex.Message, Code = ApplicationConstants.ErrorCodes.PurchaseNotFound });
         }
         catch (ExchangeRateUnavailableException ex)
         {
-            return BadRequest(new { Error = ex.Message, Code = "EXCHANGE_RATE_UNAVAILABLE" });
+            return BadRequest(new { Error = ex.Message, Code = ApplicationConstants.ErrorCodes.ExchangeRateUnavailable });
         }
         catch (Exception ex)
         {
-            return BadRequest(new { Error = ex.Message, Code = "UNEXPECTED_ERROR" });
+            return BadRequest(new { Error = ex.Message, Code = ApplicationConstants.ErrorCodes.UnexpectedError });
         }
     }
 }

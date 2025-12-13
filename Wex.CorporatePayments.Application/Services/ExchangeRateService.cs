@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
+using Wex.CorporatePayments.Application.Configuration;
 using Wex.CorporatePayments.Application.Exceptions;
 using Wex.CorporatePayments.Infrastructure.Clients;
 
@@ -48,8 +49,8 @@ public class ExchangeRateService : IExchangeRateService
             throw new ExchangeRateUnavailableException(currency, date);
         }
 
-        // Cache the result for 1 hour
-        await SetCacheAsync(cacheKey, rate.Value, TimeSpan.FromHours(1), cancellationToken);
+        // Cache the result for configured hours
+        await SetCacheAsync(cacheKey, rate.Value, TimeSpan.FromHours(ApplicationConstants.ExchangeRate.CacheExpirationHours), cancellationToken);
         
         _logger.LogInformation("Retrieved and cached exchange rate {Rate} for {Currency} on {Date}", 
             rate.Value, currency, date);
@@ -66,11 +67,11 @@ public class ExchangeRateService : IExchangeRateService
             return rate.Value;
         }
 
-        // If not found, try previous dates within 6 months
-        var sixMonthsAgo = date.AddMonths(-6);
+        // If not found, try previous dates within configured months
+        var fallbackMonthsAgo = date.AddMonths(-ApplicationConstants.ExchangeRate.FallbackMonths);
         var currentDate = date.AddDays(-1); // Start from yesterday
 
-        while (currentDate >= sixMonthsAgo)
+        while (currentDate >= fallbackMonthsAgo)
         {
             rate = await _treasuryApiClient.GetExchangeRateAsync(currency, currentDate, cancellationToken);
             if (rate.HasValue)
@@ -83,7 +84,7 @@ public class ExchangeRateService : IExchangeRateService
             currentDate = currentDate.AddDays(-1);
         }
 
-        _logger.LogWarning("No exchange rate found for {Currency} within 6 months of {Date}", currency, date);
+        _logger.LogWarning("No exchange rate found for {Currency} within {Months} months of {Date}", currency, ApplicationConstants.ExchangeRate.FallbackMonths, date);
         return null;
     }
 

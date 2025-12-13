@@ -1,4 +1,5 @@
 using MediatR;
+using Wex.CorporatePayments.Application.Configuration;
 using Wex.CorporatePayments.Domain.ValueObjects;
 
 namespace Wex.CorporatePayments.Application.Queries;
@@ -8,7 +9,7 @@ public record RetrieveConvertedPurchaseQuery : IRequest<RetrieveConvertedPurchas
     public Guid Id { get; }
     public string TargetCurrency { get; }
 
-    public RetrieveConvertedPurchaseQuery(Guid id, string targetCurrency = "BRL")
+    public RetrieveConvertedPurchaseQuery(Guid id, string targetCurrency = ApplicationConstants.Currency.Default)
     {
         Id = id;
         TargetCurrency = targetCurrency.ToUpperInvariant();
