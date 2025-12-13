@@ -8,8 +8,21 @@ using Wex.CorporatePayments.Infrastructure.Repositories;
 using FluentValidation;
 using FluentValidation.AspNetCore;
 using MediatR;
+using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Configure Serilog programmatically
+builder.Host.UseSerilog((context, configuration) =>
+    configuration
+        .MinimumLevel.Information()
+        .MinimumLevel.Override("Microsoft", Serilog.Events.LogEventLevel.Warning)
+        .MinimumLevel.Override("System", Serilog.Events.LogEventLevel.Warning)
+        .Enrich.FromLogContext()
+        .Enrich.WithMachineName()
+        .Enrich.WithThreadId()
+        .WriteTo.Console(
+            outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} {Level:u3}] {SourceContext}: {Message:lj} {Properties:j}{NewLine}{Exception}"));
 
 // Add services to the container.
 builder.Services.AddControllers();

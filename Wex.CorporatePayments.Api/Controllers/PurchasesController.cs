@@ -6,6 +6,7 @@ using Wex.CorporatePayments.Application.Exceptions;
 using Wex.CorporatePayments.Application.Queries;
 using Wex.CorporatePayments.Application.UseCases;
 using FluentValidation;
+using Serilog;
 
 namespace Wex.CorporatePayments.Api.Controllers;
 
@@ -34,8 +35,9 @@ public class PurchasesController : ControllerBase
         }
         catch (ValidationException ex)
         {
-            // Return 400 Bad Request with validation errors
-            var errors = ex.Errors.Select(e => new 
+            Log.Warning("Validation failed for purchase creation with {@Errors}", ex.Errors.Select(e => new { e.PropertyName, e.ErrorMessage, e.AttemptedValue }));
+            
+            var errors = ex.Errors.Select(e => new
             {
                 Property = e.PropertyName,
                 ErrorMessage = e.ErrorMessage,
@@ -50,6 +52,8 @@ public class PurchasesController : ControllerBase
         }
         catch (IdempotencyConflictException ex)
         {
+            Log.Warning("Idempotency conflict detected for key {IdempotencyKey}", ex.IdempotencyKey);
+            
             // Return 409 Conflict for duplicate idempotency key
             return Conflict(new { 
                 Error = ex.Message, 
@@ -59,6 +63,7 @@ public class PurchasesController : ControllerBase
         }
         catch (Exception ex)
         {
+            Log.Error(ex, "Unexpected error during purchase creation");
             return BadRequest(new { Error = ex.Message });
         }
     }
@@ -68,6 +73,8 @@ public class PurchasesController : ControllerBase
     {
         try
         {
+            Log.Information("Retrieving purchase {PurchaseId} with currency conversion to {TargetCurrency}", id, currency);
+            
             var query = new RetrieveConvertedPurchaseQuery(id, currency);
             var result = await _mediator.Send(query, cancellationToken);
             
@@ -92,14 +99,17 @@ public class PurchasesController : ControllerBase
         }
         catch (KeyNotFoundException ex)
         {
+            Log.Warning("Purchase not found: {PurchaseId}", id);
             return NotFound(new { Error = ex.Message, Code = ApplicationConstants.ErrorCodes.PurchaseNotFound });
         }
         catch (ExchangeRateUnavailableException ex)
         {
+            Log.Warning("Exchange rate unavailable for currency {Currency} on date {Date}", currency, ex.Date);
             return BadRequest(new { Error = ex.Message, Code = ApplicationConstants.ErrorCodes.ExchangeRateUnavailable });
         }
         catch (Exception ex)
         {
+            Log.Error(ex, "Unexpected error retrieving purchase {PurchaseId}", id);
             return BadRequest(new { Error = ex.Message, Code = ApplicationConstants.ErrorCodes.UnexpectedError });
         }
     }
