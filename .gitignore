@@ -1,0 +1,21 @@
+# Visual Studio and .NET artifacts
+[Bb]in/
+[Oo]bj/
+
+# NuGet
+*.nupkg
+.nuget/
+
+# IDE Configuration
+*.user
+*.suo
+.vs/
+.idea/
+
+# Local Database Files (CRITICAL: Prevents committing the SQLite DB file)
+*.db
+*.sqlite
+wex_corporate_payments.db
+
+# Test Results
+TestResults/
