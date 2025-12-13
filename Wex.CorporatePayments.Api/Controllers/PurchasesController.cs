@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
+using MediatR;
 using Wex.CorporatePayments.Application.Commands;
 using Wex.CorporatePayments.Application.Exceptions;
+using Wex.CorporatePayments.Application.Queries;
 using Wex.CorporatePayments.Application.UseCases;
 using FluentValidation;
 
@@ -11,10 +13,14 @@ namespace Wex.CorporatePayments.Api.Controllers;
 public class PurchasesController : ControllerBase
 {
     private readonly IStorePurchaseTransactionUseCase _storePurchaseTransactionUseCase;
+    private readonly IMediator _mediator;
 
-    public PurchasesController(IStorePurchaseTransactionUseCase storePurchaseTransactionUseCase)
+    public PurchasesController(
+        IStorePurchaseTransactionUseCase storePurchaseTransactionUseCase,
+        IMediator mediator)
     {
         _storePurchaseTransactionUseCase = storePurchaseTransactionUseCase;
+        _mediator = mediator;
     }
 
     [HttpPost]
@@ -57,10 +63,43 @@ public class PurchasesController : ControllerBase
     }
 
     [HttpGet("{id:guid}")]
-    public async Task<IActionResult> GetPurchase(Guid id, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> GetPurchase(Guid id, [FromQuery] string currency = "BRL", CancellationToken cancellationToken = default)
     {
-        // This would require implementing GetById in the use case
-        // For now, return a placeholder response
-        return Ok(new { Id = id, Message = "Purchase retrieval not implemented yet" });
+        try
+        {
+            var query = new RetrieveConvertedPurchaseQuery(id, currency);
+            var result = await _mediator.Send(query, cancellationToken);
+            
+            return Ok(new
+            {
+                Id = result.Id,
+                Description = result.Description,
+                TransactionDate = result.TransactionDate,
+                OriginalAmount = new
+                {
+                    Value = result.OriginalAmount.Amount,
+                    Currency = result.OriginalAmount.Currency
+                },
+                ConvertedAmount = new
+                {
+                    Value = result.ConvertedAmount.Amount,
+                    Currency = result.ConvertedAmount.Currency
+                },
+                ExchangeRate = result.ExchangeRate,
+                ExchangeRateDate = result.ExchangeRateDate
+            });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { Error = ex.Message, Code = "PURCHASE_NOT_FOUND" });
+        }
+        catch (ExchangeRateUnavailableException ex)
+        {
+            return BadRequest(new { Error = ex.Message, Code = "EXCHANGE_RATE_UNAVAILABLE" });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { Error = ex.Message, Code = "UNEXPECTED_ERROR" });
+        }
     }
 }
