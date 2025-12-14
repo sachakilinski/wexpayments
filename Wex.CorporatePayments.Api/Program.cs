@@ -3,12 +3,16 @@ using Wex.CorporatePayments.Application.Interfaces;
 using Wex.CorporatePayments.Application.UseCases;
 using Wex.CorporatePayments.Application.Validators;
 using Wex.CorporatePayments.Application.Behaviors;
+using Wex.CorporatePayments.Application.Services;
 using Wex.CorporatePayments.Infrastructure.Data;
 using Wex.CorporatePayments.Infrastructure.Repositories;
+using Wex.CorporatePayments.Infrastructure.Clients;
 using FluentValidation;
 using FluentValidation.AspNetCore;
 using MediatR;
 using Serilog;
+using Polly;
+using Polly.Extensions.Http;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -27,6 +31,29 @@ builder.Host.UseSerilog((context, configuration) =>
 // Add services to the container.
 builder.Services.AddControllers();
 
+// Configure distributed cache (in-memory for self-contained requirement)
+builder.Services.AddDistributedMemoryCache();
+
+// Configure Polly policies for HTTP resilience
+var retryPolicy = HttpPolicyExtensions
+    .HandleTransientHttpError()
+    .OrResult(msg => msg.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+    .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)));
+
+var circuitBreakerPolicy = HttpPolicyExtensions
+    .HandleTransientHttpError()
+    .CircuitBreakerAsync(5, TimeSpan.FromSeconds(30));
+
+// Add HttpClient for TreasuryApiClient with Polly policies
+builder.Services.AddHttpClient<ITreasuryApiClient, TreasuryApiClient>(client =>
+{
+    client.BaseAddress = new Uri(builder.Configuration["TreasuryApi:BaseUrl"] 
+                               ?? throw new InvalidOperationException("TreasuryApi:BaseUrl não configurado."));
+    client.Timeout = TimeSpan.FromSeconds(30);
+})
+.AddPolicyHandler(retryPolicy)
+.AddPolicyHandler(circuitBreakerPolicy);
+
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -41,8 +68,14 @@ builder.Services.AddScoped<IPurchaseRepository, PurchaseRepository>();
 // Register use cases
 builder.Services.AddScoped<IStorePurchaseTransactionUseCase, StorePurchaseTransactionUseCase>();
 
-// Add MediatR
-builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(StorePurchaseTransactionUseCase).Assembly));
+// Register services
+builder.Services.AddScoped<IExchangeRateService, ExchangeRateService>();
+
+// Add MediatR with ValidationBehavior
+builder.Services.AddMediatR(cfg => {
+    cfg.RegisterServicesFromAssembly(typeof(StorePurchaseTransactionUseCase).Assembly);
+    cfg.AddBehavior(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
+});
 
 // Add FluentValidation
 builder.Services.AddValidatorsFromAssemblyContaining<StorePurchaseCommandValidator>();
