@@ -4,12 +4,14 @@ using Microsoft.Extensions.Logging;
 using Polly;
 using Polly.CircuitBreaker;
 using Polly.Retry;
+using Wex.CorporatePayments.Application.DTOs;
 
 namespace Wex.CorporatePayments.Infrastructure.Clients;
 
 public interface ITreasuryApiClient
 {
     Task<decimal?> GetExchangeRateAsync(string currency, DateTime date, CancellationToken cancellationToken = default);
+    Task<List<ExchangeRateDto>> GetExchangeRatesRangeAsync(string currency, DateTime startDate, CancellationToken cancellationToken = default);
 }
 
 public class TreasuryApiClient : ITreasuryApiClient
@@ -121,6 +123,69 @@ public class TreasuryApiClient : ITreasuryApiClient
         {
             _logger.LogError(ex, "Unexpected error when getting exchange rate for {Currency} on {Date}", currency, date);
             return null;
+        }
+    }
+
+    public async Task<List<ExchangeRateDto>> GetExchangeRatesRangeAsync(string currency, DateTime startDate, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            // Build the request URL for Treasury API range query
+            var startDateParam = startDate.ToString("yyyy-MM-dd");
+            var requestUrl = $"/services/api/fiscal_service/v1/accounting/od/rates_of_exchange" +
+                           $"?fields=country_currency_desc,exchange_rate,record_date" +
+                           $"&filter=country_currency_desc:eq:{currency}" +
+                           $"&filter=record_date:gte:{startDateParam}" +
+                           $"&sort=-record_date" +
+                           $"&page[size]=1000"; // Get up to 1000 records
+
+            var response = await _circuitBreakerPolicy.ExecuteAsync(() =>
+                _retryPolicy.ExecuteAsync(() =>
+                    _httpClient.GetAsync(requestUrl, cancellationToken)));
+
+            response.EnsureSuccessStatusCode();
+
+            var content = await response.Content.ReadAsStringAsync(cancellationToken);
+            var treasuryResponse = JsonSerializer.Deserialize<TreasuryApiResponse>(content, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+
+            var rates = treasuryResponse?.Data?
+                .Where(d => !string.IsNullOrEmpty(d.CountryCurrencyDesc))
+                .Select(d => new ExchangeRateDto
+                {
+                    Currency = d.CountryCurrencyDesc,
+                    Rate = d.ExchangeRate,
+                    Date = DateTime.Parse(d.RecordDate),
+                    RecordDate = DateTime.Parse(d.RecordDate)
+                })
+                .ToList() ?? new List<ExchangeRateDto>();
+
+            _logger.LogInformation("Retrieved {Count} exchange rates for {Currency} from {StartDate}", 
+                rates.Count, currency, startDate);
+
+            return rates;
+        }
+        catch (BrokenCircuitException)
+        {
+            _logger.LogError("Circuit breaker is open - Treasury API unavailable");
+            return new List<ExchangeRateDto>();
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogError(ex, "HTTP error when calling Treasury API for {Currency} range from {StartDate}", currency, startDate);
+            return new List<ExchangeRateDto>();
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogError(ex, "Error parsing Treasury API response for {Currency} range from {StartDate}", currency, startDate);
+            return new List<ExchangeRateDto>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error when getting exchange rates range for {Currency} from {StartDate}", currency, startDate);
+            return new List<ExchangeRateDto>();
         }
     }
 }
