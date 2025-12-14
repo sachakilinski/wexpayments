@@ -6,7 +6,7 @@ using Wex.CorporatePayments.Application.Exceptions;
 using Wex.CorporatePayments.Application.Queries;
 using Wex.CorporatePayments.Application.UseCases;
 using FluentValidation;
-using Serilog;
+using Wex.CorporatePayments.Api.Models;
 
 namespace Wex.CorporatePayments.Api.Controllers;
 
@@ -16,13 +16,16 @@ public class PurchasesController : ControllerBase
 {
     private readonly IStorePurchaseTransactionUseCase _storePurchaseTransactionUseCase;
     private readonly IMediator _mediator;
+    private readonly ILogger<PurchasesController> _logger;
 
     public PurchasesController(
         IStorePurchaseTransactionUseCase storePurchaseTransactionUseCase,
-        IMediator mediator)
+        IMediator mediator,
+        ILogger<PurchasesController> logger)
     {
         _storePurchaseTransactionUseCase = storePurchaseTransactionUseCase;
         _mediator = mediator;
+        _logger = logger;
     }
 
     [HttpPost]
@@ -35,36 +38,38 @@ public class PurchasesController : ControllerBase
         }
         catch (ValidationException ex)
         {
-            Log.Warning("Validation failed for purchase creation with {@Errors}", ex.Errors.Select(e => new { e.PropertyName, e.ErrorMessage, e.AttemptedValue }));
+            _logger.LogWarning("Validation failed for purchase creation with {@Errors}", ex.Errors.Select(e => new { e.PropertyName, e.ErrorMessage, e.AttemptedValue }));
             
-            var errors = ex.Errors.Select(e => new
+            var errorDetails = ex.Errors.Select(e => new ValidationErrorDetail
             {
                 Property = e.PropertyName,
-                ErrorMessage = e.ErrorMessage,
+                Message = e.ErrorMessage,
                 AttemptedValue = e.AttemptedValue
-            });
+            }).ToList();
             
-            return BadRequest(new { 
+            return BadRequest(new ErrorResponse 
+            { 
                 Error = "Validation failed",
                 Code = ApplicationConstants.ErrorCodes.ValidationFailed,
-                Errors = errors
+                Details = errorDetails
             });
         }
         catch (IdempotencyConflictException ex)
         {
-            Log.Warning("Idempotency conflict detected for key {IdempotencyKey}", ex.IdempotencyKey);
+            _logger.LogWarning("Idempotency conflict detected for key {IdempotencyKey}", ex.IdempotencyKey);
             
             // Return 409 Conflict for duplicate idempotency key
-            return Conflict(new { 
+            return Conflict(new ErrorResponse 
+            { 
                 Error = ex.Message, 
-                IdempotencyKey = ex.IdempotencyKey,
-                Code = ApplicationConstants.ErrorCodes.IdempotencyConflict
+                Code = ApplicationConstants.ErrorCodes.IdempotencyConflict,
+                Details = new { IdempotencyKey = ex.IdempotencyKey }
             });
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "Unexpected error during purchase creation");
-            return BadRequest(new { Error = ex.Message });
+            _logger.LogError(ex, "Unexpected error during purchase creation");
+            return BadRequest(new ErrorResponse { Error = ex.Message });
         }
     }
 
@@ -73,7 +78,7 @@ public class PurchasesController : ControllerBase
     {
         try
         {
-            Log.Information("Retrieving purchase {PurchaseId} with currency conversion to {TargetCurrency}", id, currency);
+            _logger.LogInformation("Retrieving purchase {PurchaseId} with currency conversion to {TargetCurrency}", id, currency);
             
             var query = new RetrieveConvertedPurchaseQuery(id, currency);
             var result = await _mediator.Send(query, cancellationToken);
@@ -99,18 +104,18 @@ public class PurchasesController : ControllerBase
         }
         catch (KeyNotFoundException ex)
         {
-            Log.Warning("Purchase not found: {PurchaseId}", id);
-            return NotFound(new { Error = ex.Message, Code = ApplicationConstants.ErrorCodes.PurchaseNotFound });
+            _logger.LogWarning("Purchase not found: {PurchaseId}", id);
+            return NotFound(new ErrorResponse { Error = ex.Message, Code = ApplicationConstants.ErrorCodes.PurchaseNotFound });
         }
         catch (ExchangeRateUnavailableException ex)
         {
-            Log.Warning("Exchange rate unavailable for currency {Currency} on date {Date}", currency, ex.Date);
-            return BadRequest(new { Error = ex.Message, Code = ApplicationConstants.ErrorCodes.ExchangeRateUnavailable });
+            _logger.LogWarning("Exchange rate unavailable for currency {Currency} on date {Date}", currency, ex.Date);
+            return BadRequest(new ErrorResponse { Error = ex.Message, Code = ApplicationConstants.ErrorCodes.ExchangeRateUnavailable });
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "Unexpected error retrieving purchase {PurchaseId}", id);
-            return BadRequest(new { Error = ex.Message, Code = ApplicationConstants.ErrorCodes.UnexpectedError });
+            _logger.LogError(ex, "Unexpected error retrieving purchase {PurchaseId}", id);
+            return BadRequest(new ErrorResponse { Error = ex.Message, Code = ApplicationConstants.ErrorCodes.UnexpectedError });
         }
     }
 }
