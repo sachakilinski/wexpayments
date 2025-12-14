@@ -15,6 +15,8 @@ public static class ApplicationConstants
     {
         public const int CacheExpirationHours = 1;
         public const int FallbackMonths = 6;
+        public const int HistoricalCacheDays = 30; // d-1 to 6 months
+        public const int EternalCacheDays = -1; // d-1 and older (no expiration)
     }
 
     public static class Validation

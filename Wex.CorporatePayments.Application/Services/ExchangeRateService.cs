@@ -30,30 +30,55 @@ public class ExchangeRateService : IExchangeRateService
 
     public async Task<decimal> GetExchangeRateAsync(string currency, DateTime date, CancellationToken cancellationToken = default)
     {
-        // Check cache first
-        var cacheKey = $"exchange_rate_{currency}_{date:yyyy-MM-dd}";
+        var today = DateTime.Today;
+        var requestedDate = date.Date;
+        
+        // d0: No cache, always fetch from API
+        if (requestedDate == today)
+        {
+            _logger.LogInformation("Fetching current day rate for {Currency} on {Date} (no cache)", currency, requestedDate);
+            var rate = await _treasuryApiClient.GetExchangeRateAsync(currency, requestedDate, cancellationToken);
+            
+            if (!rate.HasValue)
+            {
+                throw new ExchangeRateUnavailableException(currency, requestedDate);
+            }
+            
+            return rate.Value;
+        }
+        
+        // For historical dates, check cache first
+        var cacheKey = $"exchange_rate_{currency}_{requestedDate:yyyy-MM-dd}";
         var cachedRate = await GetFromCacheAsync(cacheKey, cancellationToken);
         
         if (cachedRate.HasValue)
         {
             _logger.LogDebug("Retrieved exchange rate {Rate} for {Currency} on {Date} from cache", 
-                cachedRate.Value, currency, date);
+                cachedRate.Value, currency, requestedDate);
             return cachedRate.Value;
         }
 
+        // d-1 and older: Try 6-month cache lookup before HTTP
+        var cachedRateFromHistory = await TryGetFromHistoricalCacheAsync(currency, requestedDate, cancellationToken);
+        if (cachedRateFromHistory.HasValue)
+        {
+            return cachedRateFromHistory.Value;
+        }
+
         // Try to get rate from Treasury API with 6-month window
-        var rate = await GetRateFromApiWithFallback(currency, date, cancellationToken);
+        var rate = await GetRateFromApiWithFallback(currency, requestedDate, cancellationToken);
         
         if (!rate.HasValue)
         {
-            throw new ExchangeRateUnavailableException(currency, date);
+            throw new ExchangeRateUnavailableException(currency, requestedDate);
         }
 
-        // Cache the result for configured hours
-        await SetCacheAsync(cacheKey, rate.Value, TimeSpan.FromHours(ApplicationConstants.ExchangeRate.CacheExpirationHours), cancellationToken);
+        // Cache with appropriate expiration based on date
+        var cacheExpiration = GetCacheExpiration(requestedDate, today);
+        await SetCacheAsync(cacheKey, rate.Value, cacheExpiration, cancellationToken);
         
-        _logger.LogInformation("Retrieved and cached exchange rate {Rate} for {Currency} on {Date}", 
-            rate.Value, currency, date);
+        _logger.LogInformation("Retrieved and cached exchange rate {Rate} for {Currency} on {Date} with expiration {Expiration}", 
+            rate.Value, currency, requestedDate, cacheExpiration);
         
         return rate.Value;
     }
@@ -88,6 +113,50 @@ public class ExchangeRateService : IExchangeRateService
         return null;
     }
 
+    private async Task<decimal?> TryGetFromHistoricalCacheAsync(string currency, DateTime requestedDate, CancellationToken cancellationToken)
+    {
+        var today = DateTime.Today;
+        var sixMonthsAgo = today.AddMonths(-ApplicationConstants.ExchangeRate.FallbackMonths);
+        
+        // Only search in cache if requested date is within 6 months
+        if (requestedDate < sixMonthsAgo)
+        {
+            return null;
+        }
+        
+        // Search cache for the last 6 months
+        var currentDate = today.AddDays(-1); // Start from yesterday
+        while (currentDate >= sixMonthsAgo)
+        {
+            var cacheKey = $"exchange_rate_{currency}_{currentDate:yyyy-MM-dd}";
+            var cachedRate = await GetFromCacheAsync(cacheKey, cancellationToken);
+            
+            if (cachedRate.HasValue)
+            {
+                _logger.LogInformation("Found historical rate {Rate} for {Currency} on {CachedDate} for requested date {RequestedDate}", 
+                    cachedRate.Value, currency, currentDate, requestedDate);
+                return cachedRate.Value;
+            }
+            
+            currentDate = currentDate.AddDays(-1);
+        }
+        
+        return null;
+    }
+
+    private TimeSpan GetCacheExpiration(DateTime requestedDate, DateTime today)
+    {
+        var daysDifference = (today - requestedDate).Days;
+        
+        // d-1 and older: Eternal cache
+        if (daysDifference >= 1)
+        {
+            return TimeSpan.MaxValue; // Eternal cache
+        }
+        
+        // Future dates or d0: No cache (this shouldn't reach here due to earlier logic)
+        return TimeSpan.Zero;
+    }
     private async Task<decimal?> GetFromCacheAsync(string key, CancellationToken cancellationToken)
     {
         try
