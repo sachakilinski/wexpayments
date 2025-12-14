@@ -1,10 +1,10 @@
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
+using Wex.CorporatePayments.Application.DTOs;
+using Wex.CorporatePayments.Application.Interfaces;
 using Wex.CorporatePayments.Application.Configuration;
 using Wex.CorporatePayments.Application.Exceptions;
-using Wex.CorporatePayments.Application.DTOs;
-using Wex.CorporatePayments.Infrastructure.Clients;
 
 namespace Wex.CorporatePayments.Application.Services;
 

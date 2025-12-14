@@ -5,14 +5,9 @@ using Polly;
 using Polly.CircuitBreaker;
 using Polly.Retry;
 using Wex.CorporatePayments.Application.DTOs;
+using Wex.CorporatePayments.Application.Interfaces;
 
 namespace Wex.CorporatePayments.Infrastructure.Clients;
-
-public interface ITreasuryApiClient
-{
-    Task<decimal?> GetExchangeRateAsync(string currency, DateTime date, CancellationToken cancellationToken = default);
-    Task<List<ExchangeRateDto>> GetExchangeRatesRangeAsync(string currency, DateTime startDate, CancellationToken cancellationToken = default);
-}
 
 public class TreasuryApiClient : ITreasuryApiClient
 {
@@ -33,7 +28,7 @@ public class TreasuryApiClient : ITreasuryApiClient
         // Configure retry policy with exponential backoff
         _retryPolicy = Policy<HttpResponseMessage>
             .Handle<HttpRequestException>()
-            .OrResult(msg => msg.StatusCode >= 500 || msg.StatusCode == System.Net.HttpStatusCode.RequestTimeout)
+            .OrResult(msg => (int)msg.StatusCode >= 500 || msg.StatusCode == System.Net.HttpStatusCode.RequestTimeout)
             .WaitAndRetryAsync(
                 retryCount: 3,
                 sleepDurationProvider: retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
@@ -49,19 +44,12 @@ public class TreasuryApiClient : ITreasuryApiClient
         // Configure circuit breaker policy
         _circuitBreakerPolicy = Policy<HttpResponseMessage>
             .Handle<HttpRequestException>()
-            .OrResult(msg => msg.StatusCode >= 500)
-            .CircuitBreakerAsync(
-                exceptionsAllowedBeforeBreaking: 5,
-                durationOfBreak: TimeSpan.FromSeconds(30),
-                onBreak: (exception, duration) =>
-                {
-                    _logger.LogError(
-                        "Circuit breaker opened for {Duration}s due to {Reason}",
-                        duration.TotalSeconds,
-                        exception.Exception?.Message ?? exception.Result?.StatusCode.ToString());
-                },
-                onReset: () => _logger.LogInformation("Circuit breaker reset"),
-                onHalfOpen: () => _logger.LogInformation("Circuit breaker half-open"));
+            .OrResult(msg => (int)msg.StatusCode >= 500)
+            .AdvancedCircuitBreakerAsync(
+                failureThreshold: 0.5,
+                samplingDuration: TimeSpan.FromSeconds(30),
+                minimumThroughput: 5,
+                durationOfBreak: TimeSpan.FromSeconds(30));
     }
 
     public async Task<decimal?> GetExchangeRateAsync(string currency, DateTime date, CancellationToken cancellationToken = default)

@@ -58,6 +58,7 @@ public class PurchasesControllerIdempotencyTests : IClassFixture<WebApplicationF
             Description = "Test Purchase",
             TransactionDate = DateTime.UtcNow,
             Amount = 100.50m,
+            Currency = "USD",
             IdempotencyKey = null
         };
 
@@ -84,7 +85,7 @@ public class PurchasesControllerIdempotencyTests : IClassFixture<WebApplicationF
             
             Assert.NotNull(purchase);
             Assert.Equal("Test Purchase", purchase.Description);
-            Assert.Equal(100.50m, purchase.Amount);
+            Assert.Equal(100.50m, purchase.OriginalAmount.Amount);
         }
     }
 
@@ -107,6 +108,7 @@ public class PurchasesControllerIdempotencyTests : IClassFixture<WebApplicationF
             Description = "Test Purchase",
             TransactionDate = DateTime.UtcNow,
             Amount = 100.50m,
+            Currency = "USD",
             IdempotencyKey = idempotencyKey
         };
 
@@ -172,6 +174,7 @@ public class PurchasesControllerIdempotencyTests : IClassFixture<WebApplicationF
             Description = "Test Purchase 1",
             TransactionDate = DateTime.UtcNow,
             Amount = 100.50m,
+            Currency = "USD",
             IdempotencyKey = idempotencyKey1
         };
 
@@ -180,6 +183,7 @@ public class PurchasesControllerIdempotencyTests : IClassFixture<WebApplicationF
             Description = "Test Purchase 2",
             TransactionDate = DateTime.UtcNow,
             Amount = 200.75m,
+            Currency = "USD",
             IdempotencyKey = idempotencyKey2
         };
 
@@ -239,6 +243,7 @@ public class PurchasesControllerIdempotencyTests : IClassFixture<WebApplicationF
             Description = "Test Purchase",
             TransactionDate = DateTime.UtcNow,
             Amount = 100.50m,
+            Currency = "USD",
             IdempotencyKey = null
         };
 
@@ -296,6 +301,7 @@ public class PurchasesControllerIdempotencyTests : IClassFixture<WebApplicationF
             Description = "Test Purchase",
             TransactionDate = DateTime.UtcNow,
             Amount = 100.50m,
+            Currency = "USD",
             IdempotencyKey = ""
         };
 
@@ -335,7 +341,7 @@ public class PurchasesControllerIdempotencyTests : IClassFixture<WebApplicationF
         }
     }
 
-    public void Dispose()
+    private void Dispose()
     {
         // Clean up test database
         if (File.Exists(_databasePath))

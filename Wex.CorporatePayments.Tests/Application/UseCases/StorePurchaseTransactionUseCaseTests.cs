@@ -6,6 +6,7 @@ using Wex.CorporatePayments.Application.Exceptions;
 using Wex.CorporatePayments.Application.Interfaces;
 using Wex.CorporatePayments.Application.UseCases;
 using Wex.CorporatePayments.Domain.Entities;
+using Wex.CorporatePayments.Domain.ValueObjects;
 using Microsoft.Data.Sqlite;
 
 namespace Wex.CorporatePayments.Tests.Application.UseCases;
@@ -55,10 +56,11 @@ public class StorePurchaseTransactionUseCaseTests
     {
         // Arrange
         var existingPurchaseId = Guid.NewGuid();
+        var money = Money.Create(50.00m, "USD");
         var existingPurchase = new Purchase(
             "Existing Purchase",
             DateTime.UtcNow.AddDays(-1),
-            50.00m,
+            money,
             "existing-key"
         );
 
@@ -67,6 +69,7 @@ public class StorePurchaseTransactionUseCaseTests
             Description = "Test Purchase",
             TransactionDate = DateTime.UtcNow,
             Amount = 100.50m,
+            Currency = "USD",
             IdempotencyKey = "existing-key"
         };
 
@@ -91,6 +94,7 @@ public class StorePurchaseTransactionUseCaseTests
             Description = "Test Purchase",
             TransactionDate = DateTime.UtcNow,
             Amount = 100.50m,
+            Currency = "USD",
             IdempotencyKey = "test-key"
         };
 
@@ -99,7 +103,7 @@ public class StorePurchaseTransactionUseCaseTests
             .ReturnsAsync((Purchase?)null);
 
         var sqliteException = new SqliteException("UNIQUE constraint failed: Purchases.IdempotencyKey", 2067);
-        var dbUpdateException = new DbUpdateException("Database update failed", sqliteException);
+        var dbUpdateException = new DbUpdateException("Database update failed", sqliteException, (IReadOnlyList<Microsoft.EntityFrameworkCore.Update.IUpdateEntry>)null!);
 
         _purchaseRepositoryMock
             .Setup(r => r.AddAsync(It.IsAny<Purchase>(), It.IsAny<CancellationToken>()))
@@ -118,7 +122,7 @@ public class StorePurchaseTransactionUseCaseTests
     {
         // Arrange
         var sqliteException = new SqliteException("UNIQUE constraint failed", 2067);
-        var dbUpdateException = new DbUpdateException("Database update failed", sqliteException);
+        var dbUpdateException = new DbUpdateException("Database update failed", sqliteException, (IReadOnlyList<Microsoft.EntityFrameworkCore.Update.IUpdateEntry>)null!);
 
         // Act
         var result = StorePurchaseTransactionUseCaseTestsHelper.InvokeIsUniqueConstraintViolation(dbUpdateException);
@@ -132,7 +136,7 @@ public class StorePurchaseTransactionUseCaseTests
     {
         // Arrange
         var sqliteException = new SqliteException("constraint violation", 19);
-        var dbUpdateException = new DbUpdateException("Database update failed", sqliteException);
+        var dbUpdateException = new DbUpdateException("Database update failed", sqliteException, (IReadOnlyList<Microsoft.EntityFrameworkCore.Update.IUpdateEntry>)null!);
 
         // Act
         var result = StorePurchaseTransactionUseCaseTestsHelper.InvokeIsUniqueConstraintViolation(dbUpdateException);
@@ -146,7 +150,7 @@ public class StorePurchaseTransactionUseCaseTests
     {
         // Arrange
         var innerException = new Exception("unique constraint violation occurred");
-        var dbUpdateException = new DbUpdateException("Database update failed", innerException);
+        var dbUpdateException = new DbUpdateException("Database update failed", innerException, (IReadOnlyList<Microsoft.EntityFrameworkCore.Update.IUpdateEntry>)null!);
 
         // Act
         var result = StorePurchaseTransactionUseCaseTestsHelper.InvokeIsUniqueConstraintViolation(dbUpdateException);
@@ -160,7 +164,7 @@ public class StorePurchaseTransactionUseCaseTests
     {
         // Arrange
         var innerException = new Exception("constraint violation occurred");
-        var dbUpdateException = new DbUpdateException("Database update failed", innerException);
+        var dbUpdateException = new DbUpdateException("Database update failed", innerException, (IReadOnlyList<Microsoft.EntityFrameworkCore.Update.IUpdateEntry>)null!);
 
         // Act
         var result = StorePurchaseTransactionUseCaseTestsHelper.InvokeIsUniqueConstraintViolation(dbUpdateException);
@@ -174,7 +178,7 @@ public class StorePurchaseTransactionUseCaseTests
     {
         // Arrange
         var innerException = new Exception("idempotency key violation occurred");
-        var dbUpdateException = new DbUpdateException("Database update failed", innerException);
+        var dbUpdateException = new DbUpdateException("Database update failed", innerException, (IReadOnlyList<Microsoft.EntityFrameworkCore.Update.IUpdateEntry>)null!);
 
         // Act
         var result = StorePurchaseTransactionUseCaseTestsHelper.InvokeIsUniqueConstraintViolation(dbUpdateException);
@@ -188,7 +192,7 @@ public class StorePurchaseTransactionUseCaseTests
     {
         // Arrange
         var innerException = new Exception("some other database error");
-        var dbUpdateException = new DbUpdateException("Database update failed", innerException);
+        var dbUpdateException = new DbUpdateException("Database update failed", innerException, (IReadOnlyList<Microsoft.EntityFrameworkCore.Update.IUpdateEntry>)null!);
 
         // Act
         var result = StorePurchaseTransactionUseCaseTestsHelper.InvokeIsUniqueConstraintViolation(dbUpdateException);
@@ -201,7 +205,7 @@ public class StorePurchaseTransactionUseCaseTests
     public void IsUniqueConstraintViolation_WithNullInnerException_ShouldReturnFalse()
     {
         // Arrange
-        var dbUpdateException = new DbUpdateException("Database update failed", null);
+        var dbUpdateException = new DbUpdateException("Database update failed", null, (IReadOnlyList<Microsoft.EntityFrameworkCore.Update.IUpdateEntry>)null!);
 
         // Act
         var result = StorePurchaseTransactionUseCaseTestsHelper.InvokeIsUniqueConstraintViolation(dbUpdateException);

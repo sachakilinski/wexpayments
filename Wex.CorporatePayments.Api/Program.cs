@@ -12,7 +12,6 @@ using FluentValidation.AspNetCore;
 using MediatR;
 using Serilog;
 using Polly;
-using Polly.Extensions.Http;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -23,7 +22,6 @@ builder.Host.UseSerilog((context, configuration) =>
         .MinimumLevel.Override("Microsoft", Serilog.Events.LogEventLevel.Warning)
         .MinimumLevel.Override("System", Serilog.Events.LogEventLevel.Warning)
         .Enrich.FromLogContext()
-        .Enrich.WithMachineName()
         .Enrich.WithThreadId()
         .WriteTo.Console(
             outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} {Level:u3}] {SourceContext}: {Message:lj} {Properties:j}{NewLine}{Exception}"));
@@ -35,14 +33,14 @@ builder.Services.AddControllers();
 builder.Services.AddDistributedMemoryCache();
 
 // Configure Polly policies for HTTP resilience
-var retryPolicy = HttpPolicyExtensions
-    .HandleTransientHttpError()
+var retryPolicy = Policy<HttpResponseMessage>
+    .Handle<HttpRequestException>()
     .OrResult(msg => msg.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
     .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)));
 
-var circuitBreakerPolicy = HttpPolicyExtensions
-    .HandleTransientHttpError()
-    .CircuitBreakerAsync(5, TimeSpan.FromSeconds(30));
+var circuitBreakerPolicy = Policy<HttpResponseMessage>
+    .Handle<HttpRequestException>()
+    .AdvancedCircuitBreakerAsync(0.5, TimeSpan.FromSeconds(30), 5, TimeSpan.FromSeconds(30));
 
 // Add HttpClient for TreasuryApiClient with Polly policies
 builder.Services.AddHttpClient<ITreasuryApiClient, TreasuryApiClient>(client =>

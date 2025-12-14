@@ -16,13 +16,13 @@ public record RetrieveConvertedPurchaseQuery : IRequest<RetrieveConvertedPurchas
     }
 }
 
-public record RetrieveConvertedPurchaseResponse
+public class RetrieveConvertedPurchaseResponse
 {
-    public Guid Id { get; }
-    public string Description { get; }
-    public DateTime TransactionDate { get; }
-    public Money OriginalAmount { get; }
-    public Money ConvertedAmount { get; }
-    public string ExchangeRateDate { get; }
-    public decimal ExchangeRate { get; }
+    public Guid Id { get; set; }
+    public string Description { get; set; } = string.Empty;
+    public DateTime TransactionDate { get; set; }
+    public Money OriginalAmount { get; set; } = Money.Create(0, "USD");
+    public Money ConvertedAmount { get; set; } = Money.Create(0, "USD");
+    public string ExchangeRateDate { get; set; } = string.Empty;
+    public decimal ExchangeRate { get; set; }
 }

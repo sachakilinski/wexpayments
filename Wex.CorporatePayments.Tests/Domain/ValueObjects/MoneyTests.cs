@@ -186,7 +186,7 @@ public class MoneyTests
         Assert.True(money.GetType().BaseType?.Name == "Object");
         
         // Verify it's a record type
-        var recordAttribute = money.GetType().GetCustomAttributes()
+        var recordAttribute = money.GetType().GetCustomAttributes(false)
             .Any(attr => attr.GetType().Name.Contains("CompilerGenerated"));
         Assert.True(recordAttribute);
     }

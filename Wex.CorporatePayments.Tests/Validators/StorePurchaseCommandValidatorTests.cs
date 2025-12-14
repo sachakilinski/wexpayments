@@ -23,7 +23,8 @@ public class StorePurchaseCommandValidatorTests
         {
             Description = "",
             TransactionDate = DateTime.Now,
-            Amount = 100
+            Amount = 100,
+            Currency = "USD"
         };
 
         // Act & Assert
@@ -39,7 +40,8 @@ public class StorePurchaseCommandValidatorTests
         {
             Description = "This is a very long description that exceeds fifty characters limit",
             TransactionDate = DateTime.Now,
-            Amount = 100
+            Amount = 100,
+            Currency = "USD"
         };
 
         // Act & Assert
@@ -55,7 +57,8 @@ public class StorePurchaseCommandValidatorTests
         {
             Description = "Valid Description",
             TransactionDate = DateTime.Now,
-            Amount = 0
+            Amount = 0,
+            Currency = "USD"
         };
 
         // Act & Assert
@@ -71,7 +74,8 @@ public class StorePurchaseCommandValidatorTests
         {
             Description = "Valid Description",
             TransactionDate = DateTime.Now,
-            Amount = -50
+            Amount = -50,
+            Currency = "USD"
         };
 
         // Act & Assert
@@ -87,7 +91,8 @@ public class StorePurchaseCommandValidatorTests
         {
             Description = "Valid Description",
             TransactionDate = default(DateTime),
-            Amount = 100
+            Amount = 100,
+            Currency = "USD"
         };
 
         // Act & Assert
@@ -104,6 +109,7 @@ public class StorePurchaseCommandValidatorTests
             Description = "Valid Description",
             TransactionDate = DateTime.Now,
             Amount = 100,
+            Currency = "USD",
             IdempotencyKey = "unique-key-123"
         };
 
@@ -120,7 +126,8 @@ public class StorePurchaseCommandValidatorTests
         {
             Description = "This description is exactly fifty characters long! Yes",
             TransactionDate = DateTime.Now,
-            Amount = 100
+            Amount = 100,
+            Currency = "USD"
         };
 
         // Act & Assert

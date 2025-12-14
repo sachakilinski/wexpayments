@@ -3,6 +3,7 @@ using Wex.CorporatePayments.Application.Commands;
 using Wex.CorporatePayments.Application.Exceptions;
 using Wex.CorporatePayments.Application.Interfaces;
 using Wex.CorporatePayments.Domain.Entities;
+using Wex.CorporatePayments.Domain.ValueObjects;
 
 namespace Wex.CorporatePayments.Application.UseCases;
 
@@ -28,10 +29,11 @@ public class StorePurchaseTransactionUseCase : IStorePurchaseTransactionUseCase
         }
 
         // Create new purchase entity
+        var originalAmount = Money.Create(command.Amount, command.Currency);
         var purchase = new Purchase(
             command.Description,
             command.TransactionDate,
-            command.Amount,
+            originalAmount,
             command.IdempotencyKey
         );
 
@@ -43,7 +45,7 @@ public class StorePurchaseTransactionUseCase : IStorePurchaseTransactionUseCase
         catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
         {
             // Handle unique constraint violation on IdempotencyKey
-            throw new IdempotencyConflictException(command.IdempotencyKey, ex);
+            throw new IdempotencyConflictException(command.IdempotencyKey!, ex);
         }
 
         return purchase.Id;

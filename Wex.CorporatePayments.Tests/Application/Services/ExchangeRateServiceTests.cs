@@ -4,7 +4,8 @@ using Moq;
 using Xunit;
 using Wex.CorporatePayments.Application.Exceptions;
 using Wex.CorporatePayments.Application.Services;
-using Wex.CorporatePayments.Infrastructure.Clients;
+using Wex.CorporatePayments.Application.Interfaces;
+using Wex.CorporatePayments.Application.DTOs;
 
 namespace Wex.CorporatePayments.Tests.Application.Services;
 
@@ -34,11 +35,18 @@ public class ExchangeRateServiceTests
         var currency = "BRL";
         var date = new DateTime(2023, 12, 15);
         var cachedRate = 5.25m;
-        var cacheKey = $"exchange_rate_{currency}_{date:yyyy-MM-dd}";
+        var cacheKey = $"exchange_rates_bucket_{currency}";
+        
+        // Create cached rates list
+        var cachedRates = new List<ExchangeRateDto>
+        {
+            new() { Date = date, Rate = cachedRate }
+        };
+        var serializedRates = System.Text.Json.JsonSerializer.Serialize(cachedRates);
 
         _cacheMock
             .Setup(c => c.GetStringAsync(cacheKey, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(cachedRate.ToString());
+            .ReturnsAsync(serializedRates);
 
         // Act
         var result = await _exchangeRateService.GetExchangeRateAsync(currency, date);
@@ -56,23 +64,28 @@ public class ExchangeRateServiceTests
         var currency = "BRL";
         var date = new DateTime(2023, 12, 15);
         var rate = 5.25m;
-        var cacheKey = $"exchange_rate_{currency}_{date:yyyy-MM-dd}";
+        var cacheKey = $"exchange_rates_bucket_{currency}";
 
         _cacheMock
             .Setup(c => c.GetStringAsync(cacheKey, It.IsAny<CancellationToken>()))
             .ReturnsAsync((string?)null);
 
+        var apiRates = new List<ExchangeRateDto>
+        {
+            new() { Date = date, Rate = rate }
+        };
+
         _treasuryApiClientMock
-            .Setup(c => c.GetExchangeRateAsync(currency, date, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(rate);
+            .Setup(c => c.GetExchangeRatesRangeAsync(currency, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(apiRates);
 
         // Act
         var result = await _exchangeRateService.GetExchangeRateAsync(currency, date);
 
         // Assert
         Assert.Equal(rate, result);
-        _treasuryApiClientMock.Verify(c => c.GetExchangeRateAsync(currency, date, It.IsAny<CancellationToken>()), Times.Once);
-        _cacheMock.Verify(c => c.SetStringAsync(cacheKey, rate.ToString(), It.IsAny<DistributedCacheEntryOptions>(), It.IsAny<CancellationToken>()), Times.Once);
+        _treasuryApiClientMock.Verify(c => c.GetExchangeRatesRangeAsync(currency, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()), Times.Once);
+        _cacheMock.Verify(c => c.SetStringAsync(cacheKey, It.IsAny<string>(), It.IsAny<DistributedCacheEntryOptions>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -83,41 +96,29 @@ public class ExchangeRateServiceTests
         var date = new DateTime(2023, 12, 15);
         var fallbackDate = new DateTime(2023, 12, 14);
         var rate = 5.25m;
-        var cacheKey = $"exchange_rate_{currency}_{date:yyyy-MM-dd}";
+        var cacheKey = $"exchange_rates_bucket_{currency}";
 
         _cacheMock
             .Setup(c => c.GetStringAsync(cacheKey, It.IsAny<CancellationToken>()))
             .ReturnsAsync((string?)null);
 
-        // No rate on exact date
-        _treasuryApiClientMock
-            .Setup(c => c.GetExchangeRateAsync(currency, date, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((decimal?)null);
-
-        // Rate found on fallback date
-        _treasuryApiClientMock
-            .Setup(c => c.GetExchangeRateAsync(currency, fallbackDate, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(rate);
-
-        // All other dates return null
-        for (var d = date.AddDays(-2); d >= date.AddMonths(-6); d = d.AddDays(-1))
+        // API returns rates with fallback date
+        var apiRates = new List<ExchangeRateDto>
         {
-            if (d != fallbackDate)
-            {
-                _treasuryApiClientMock
-                    .Setup(c => c.GetExchangeRateAsync(currency, d, It.IsAny<CancellationToken>()))
-                    .ReturnsAsync((decimal?)null);
-            }
-        }
+            new() { Date = fallbackDate, Rate = rate }
+        };
+
+        _treasuryApiClientMock
+            .Setup(c => c.GetExchangeRatesRangeAsync(currency, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(apiRates);
 
         // Act
         var result = await _exchangeRateService.GetExchangeRateAsync(currency, date);
 
         // Assert
         Assert.Equal(rate, result);
-        _treasuryApiClientMock.Verify(c => c.GetExchangeRateAsync(currency, date, It.IsAny<CancellationToken>()), Times.Once);
-        _treasuryApiClientMock.Verify(c => c.GetExchangeRateAsync(currency, fallbackDate, It.IsAny<CancellationToken>()), Times.Once);
-        _cacheMock.Verify(c => c.SetStringAsync(cacheKey, rate.ToString(), It.IsAny<DistributedCacheEntryOptions>(), It.IsAny<CancellationToken>()), Times.Once);
+        _treasuryApiClientMock.Verify(c => c.GetExchangeRatesRangeAsync(currency, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()), Times.Once);
+        _cacheMock.Verify(c => c.SetStringAsync(cacheKey, It.IsAny<string>(), It.IsAny<DistributedCacheEntryOptions>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -127,39 +128,31 @@ public class ExchangeRateServiceTests
         var currency = "BRL";
         var date = new DateTime(2023, 12, 15);
         var firstFallbackDate = new DateTime(2023, 12, 10);
-        var secondFallbackDate = new DateTime(2023, 12, 8);
         var rate = 5.25m;
-        var cacheKey = $"exchange_rate_{currency}_{date:yyyy-MM-dd}";
+        var cacheKey = $"exchange_rates_bucket_{currency}";
 
         _cacheMock
             .Setup(c => c.GetStringAsync(cacheKey, It.IsAny<CancellationToken>()))
             .ReturnsAsync((string?)null);
 
-        // No rate on exact date
-        _treasuryApiClientMock
-            .Setup(c => c.GetExchangeRateAsync(currency, date, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((decimal?)null);
-
-        // No rate on first few fallback dates
-        for (var d = date.AddDays(-1); d > firstFallbackDate; d = d.AddDays(-1))
+        // API returns rates with multiple dates, first available should be used
+        var apiRates = new List<ExchangeRateDto>
         {
-            _treasuryApiClientMock
-                .Setup(c => c.GetExchangeRateAsync(currency, d, It.IsAny<CancellationToken>()))
-                .ReturnsAsync((decimal?)null);
-        }
+            new() { Date = firstFallbackDate, Rate = rate },
+            new() { Date = new DateTime(2023, 12, 8), Rate = 5.30m }
+        };
 
-        // Rate found on first fallback date
         _treasuryApiClientMock
-            .Setup(c => c.GetExchangeRateAsync(currency, firstFallbackDate, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(rate);
+            .Setup(c => c.GetExchangeRatesRangeAsync(currency, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(apiRates);
 
         // Act
         var result = await _exchangeRateService.GetExchangeRateAsync(currency, date);
 
         // Assert
         Assert.Equal(rate, result);
-        _treasuryApiClientMock.Verify(c => c.GetExchangeRateAsync(currency, firstFallbackDate, It.IsAny<CancellationToken>()), Times.Once);
-        _treasuryApiClientMock.Verify(c => c.GetExchangeRateAsync(currency, secondFallbackDate, It.IsAny<CancellationToken>()), Times.Never);
+        _treasuryApiClientMock.Verify(c => c.GetExchangeRatesRangeAsync(currency, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()), Times.Once);
+        _cacheMock.Verify(c => c.SetStringAsync(cacheKey, It.IsAny<string>(), It.IsAny<DistributedCacheEntryOptions>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -168,20 +161,18 @@ public class ExchangeRateServiceTests
         // Arrange
         var currency = "BRL";
         var date = new DateTime(2023, 12, 15);
-        var sixMonthsAgo = date.AddMonths(-6);
-        var cacheKey = $"exchange_rate_{currency}_{date:yyyy-MM-dd}";
+        var cacheKey = $"exchange_rates_bucket_{currency}";
 
         _cacheMock
             .Setup(c => c.GetStringAsync(cacheKey, It.IsAny<CancellationToken>()))
             .ReturnsAsync((string?)null);
 
-        // No rate found for any date within 6 months
-        for (var d = date; d >= sixMonthsAgo; d = d.AddDays(-1))
-        {
-            _treasuryApiClientMock
-                .Setup(c => c.GetExchangeRateAsync(currency, d, It.IsAny<CancellationToken>()))
-                .ReturnsAsync((decimal?)null);
-        }
+        // API returns empty rates list
+        var apiRates = new List<ExchangeRateDto>();
+
+        _treasuryApiClientMock
+            .Setup(c => c.GetExchangeRatesRangeAsync(currency, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(apiRates);
 
         // Act & Assert
         var exception = await Assert.ThrowsAsync<ExchangeRateUnavailableException>(
@@ -189,16 +180,8 @@ public class ExchangeRateServiceTests
 
         Assert.Equal(currency, exception.Currency);
         Assert.Equal(date, exception.Date);
-        
-        // Verify it tried the exact date and all fallback dates
-        _treasuryApiClientMock.Verify(c => c.GetExchangeRateAsync(currency, date, It.IsAny<CancellationToken>()), Times.Once);
-        
-        var expectedCallCount = 1; // exact date
-        for (var d = date.AddDays(-1); d >= sixMonthsAgo; d = d.AddDays(-1))
-        {
-            expectedCallCount++;
-            _treasuryApiClientMock.Verify(c => c.GetExchangeRateAsync(currency, d, It.IsAny<CancellationToken>()), Times.Once);
-        }
+        _treasuryApiClientMock.Verify(c => c.GetExchangeRatesRangeAsync(currency, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()), Times.Once);
+        _cacheMock.Verify(c => c.SetStringAsync(cacheKey, It.IsAny<string>(), It.IsAny<DistributedCacheEntryOptions>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -209,31 +192,29 @@ public class ExchangeRateServiceTests
         var date = new DateTime(2023, 12, 15);
         var sixMonthsAgo = date.AddMonths(-6);
         var rate = 5.25m;
-        var cacheKey = $"exchange_rate_{currency}_{date:yyyy-MM-dd}";
+        var cacheKey = $"exchange_rates_bucket_{currency}";
 
         _cacheMock
             .Setup(c => c.GetStringAsync(cacheKey, It.IsAny<CancellationToken>()))
             .ReturnsAsync((string?)null);
 
-        // No rate on recent dates
-        for (var d = date; d > sixMonthsAgo; d = d.AddDays(-1))
+        // API returns rates with 6-month-old rate
+        var apiRates = new List<ExchangeRateDto>
         {
-            _treasuryApiClientMock
-                .Setup(c => c.GetExchangeRateAsync(currency, d, It.IsAny<CancellationToken>()))
-                .ReturnsAsync((decimal?)null);
-        }
+            new() { Date = sixMonthsAgo, Rate = rate }
+        };
 
-        // Rate found exactly 6 months ago
         _treasuryApiClientMock
-            .Setup(c => c.GetExchangeRateAsync(currency, sixMonthsAgo, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(rate);
+            .Setup(c => c.GetExchangeRatesRangeAsync(currency, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(apiRates);
 
         // Act
         var result = await _exchangeRateService.GetExchangeRateAsync(currency, date);
 
         // Assert
         Assert.Equal(rate, result);
-        _treasuryApiClientMock.Verify(c => c.GetExchangeRateAsync(currency, sixMonthsAgo, It.IsAny<CancellationToken>()), Times.Once);
+        _treasuryApiClientMock.Verify(c => c.GetExchangeRatesRangeAsync(currency, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()), Times.Once);
+        _cacheMock.Verify(c => c.SetStringAsync(cacheKey, It.IsAny<string>(), It.IsAny<DistributedCacheEntryOptions>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -242,33 +223,25 @@ public class ExchangeRateServiceTests
         // Arrange
         var currency = "BRL";
         var date = new DateTime(2023, 12, 15);
-        var olderThanSixMonths = date.AddMonths(-6).AddDays(-1);
-        var rate = 5.25m;
-        var cacheKey = $"exchange_rate_{currency}_{date:yyyy-MM-dd}";
+        var cacheKey = $"exchange_rates_bucket_{currency}";
 
         _cacheMock
             .Setup(c => c.GetStringAsync(cacheKey, It.IsAny<CancellationToken>()))
             .ReturnsAsync((string?)null);
 
-        // No rate within 6 months
-        for (var d = date; d >= date.AddMonths(-6); d = d.AddDays(-1))
-        {
-            _treasuryApiClientMock
-                .Setup(c => c.GetExchangeRateAsync(currency, d, It.IsAny<CancellationToken>()))
-                .ReturnsAsync((decimal?)null);
-        }
+        // API returns empty rates list (no rates within 6 months)
+        var apiRates = new List<ExchangeRateDto>();
 
-        // Rate exists but is older than 6 months (should not be checked)
         _treasuryApiClientMock
-            .Setup(c => c.GetExchangeRateAsync(currency, olderThanSixMonths, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(rate);
+            .Setup(c => c.GetExchangeRatesRangeAsync(currency, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(apiRates);
 
         // Act & Assert
         await Assert.ThrowsAsync<ExchangeRateUnavailableException>(
             () => _exchangeRateService.GetExchangeRateAsync(currency, date));
 
-        // Verify it never checked dates older than 6 months
-        _treasuryApiClientMock.Verify(c => c.GetExchangeRateAsync(currency, olderThanSixMonths, It.IsAny<CancellationToken>()), Times.Never);
+        _treasuryApiClientMock.Verify(c => c.GetExchangeRatesRangeAsync(currency, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()), Times.Once);
+        _cacheMock.Verify(c => c.SetStringAsync(cacheKey, It.IsAny<string>(), It.IsAny<DistributedCacheEntryOptions>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -278,23 +251,28 @@ public class ExchangeRateServiceTests
         var currency = "BRL";
         var date = new DateTime(2023, 12, 15);
         var rate = 5.25m;
-        var cacheKey = $"exchange_rate_{currency}_{date:yyyy-MM-dd}";
+        var cacheKey = $"exchange_rates_bucket_{currency}";
 
         // Cache throws exception on get
         _cacheMock
             .Setup(c => c.GetStringAsync(cacheKey, It.IsAny<CancellationToken>()))
             .ThrowsAsync(new Exception("Cache error"));
 
+        var apiRates = new List<ExchangeRateDto>
+        {
+            new() { Date = date, Rate = rate }
+        };
+
         _treasuryApiClientMock
-            .Setup(c => c.GetExchangeRateAsync(currency, date, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(rate);
+            .Setup(c => c.GetExchangeRatesRangeAsync(currency, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(apiRates);
 
         // Act
         var result = await _exchangeRateService.GetExchangeRateAsync(currency, date);
 
         // Assert
         Assert.Equal(rate, result);
-        _treasuryApiClientMock.Verify(c => c.GetExchangeRateAsync(currency, date, It.IsAny<CancellationToken>()), Times.Once);
+        _treasuryApiClientMock.Verify(c => c.GetExchangeRatesRangeAsync(currency, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -304,19 +282,24 @@ public class ExchangeRateServiceTests
         var currency = "BRL";
         var date = new DateTime(2023, 12, 15);
         var rate = 5.25m;
-        var cacheKey = $"exchange_rate_{currency}_{date:yyyy-MM-dd}";
+        var cacheKey = $"exchange_rates_bucket_{currency}";
 
         _cacheMock
             .Setup(c => c.GetStringAsync(cacheKey, It.IsAny<CancellationToken>()))
             .ReturnsAsync((string?)null);
 
+        var apiRates = new List<ExchangeRateDto>
+        {
+            new() { Date = date, Rate = rate }
+        };
+
         _treasuryApiClientMock
-            .Setup(c => c.GetExchangeRateAsync(currency, date, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(rate);
+            .Setup(c => c.GetExchangeRatesRangeAsync(currency, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(apiRates);
 
         // Cache throws exception on set
         _cacheMock
-            .Setup(c => c.SetStringAsync(cacheKey, rate.ToString(), It.IsAny<DistributedCacheEntryOptions>(), It.IsAny<CancellationToken>()))
+            .Setup(c => c.SetStringAsync(cacheKey, It.IsAny<string>(), It.IsAny<DistributedCacheEntryOptions>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new Exception("Cache set error"));
 
         // Act
@@ -324,7 +307,7 @@ public class ExchangeRateServiceTests
 
         // Assert
         Assert.Equal(rate, result);
-        _treasuryApiClientMock.Verify(c => c.GetExchangeRateAsync(currency, date, It.IsAny<CancellationToken>()), Times.Once);
+        _treasuryApiClientMock.Verify(c => c.GetExchangeRatesRangeAsync(currency, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Theory]
@@ -337,21 +320,26 @@ public class ExchangeRateServiceTests
         // Arrange
         var date = new DateTime(2023, 12, 15);
         var rate = 1.25m;
-        var cacheKey = $"exchange_rate_{currency}_{date:yyyy-MM-dd}";
+        var cacheKey = $"exchange_rates_bucket_{currency}";
 
         _cacheMock
             .Setup(c => c.GetStringAsync(cacheKey, It.IsAny<CancellationToken>()))
             .ReturnsAsync((string?)null);
 
+        var apiRates = new List<ExchangeRateDto>
+        {
+            new() { Date = date, Rate = rate }
+        };
+
         _treasuryApiClientMock
-            .Setup(c => c.GetExchangeRateAsync(currency, date, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(rate);
+            .Setup(c => c.GetExchangeRatesRangeAsync(currency, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(apiRates);
 
         // Act
         var result = await _exchangeRateService.GetExchangeRateAsync(currency, date);
 
         // Assert
         Assert.Equal(rate, result);
-        _treasuryApiClientMock.Verify(c => c.GetExchangeRateAsync(currency, date, It.IsAny<CancellationToken>()), Times.Once);
+        _treasuryApiClientMock.Verify(c => c.GetExchangeRatesRangeAsync(currency, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 }
