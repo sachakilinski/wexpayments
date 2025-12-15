@@ -64,7 +64,7 @@ public class TreasuryApiClient : ITreasuryApiClient
             // Build the request URL for Treasury API
             var requestUrl = $"/services/api/fiscal_service/v1/accounting/od/rates_of_exchange" +
                            $"?fields=country_currency_desc,exchange_rate,record_date" +
-                           $"&filter=record_date:gte:{dateParam},country_currency_desc:eq:{currency}" +
+                           $"&filter=record_date:lte:{dateParam},country_currency_desc:eq:{currency}" +
                            $"&sort=-record_date" +
                            $"&page[size]=1";
 

@@ -101,9 +101,9 @@ public class RetrieveConvertedPurchaseQueryHandler : IRequestHandler<RetrieveCon
         else
         {
             // Non-USD to non-USD: convert through USD as intermediate
-            // First convert to USD, then to target currency
-            var usdAmount = originalAmount.Amount / exchangeRate;
-            convertedAmount = usdAmount * exchangeRate;
+            // This requires two different exchange rates - one for original currency to USD, one for USD to target currency
+            // For now, this scenario is not supported as it requires two separate API calls
+            throw new NotSupportedException("Direct conversion between non-USD currencies is not supported. Please convert to USD first, then to the target currency.");
         }
 
         return Money.Create(convertedAmount, targetCurrency);

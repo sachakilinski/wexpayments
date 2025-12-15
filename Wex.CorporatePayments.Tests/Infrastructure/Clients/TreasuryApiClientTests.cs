@@ -71,7 +71,7 @@ public class TreasuryApiClientTests
                     req.RequestUri!.Host == "api.fiscaldata.treasury.gov" &&
                     req.RequestUri!.AbsolutePath.Contains("rates_of_exchange") &&
                     // Check for the specific filter components for this test
-                    req.RequestUri!.Query.Contains("filter=record_date:gte:2023-12-15,country_currency_desc:eq:BRL") &&
+                    req.RequestUri!.Query.Contains("filter=record_date:lte:2023-12-15,country_currency_desc:eq:BRL") &&
                     // Check for required parameters
                     req.RequestUri!.Query.Contains("fields=") &&
                     req.RequestUri!.Query.Contains("sort=") &&
@@ -355,7 +355,7 @@ public class TreasuryApiClientTests
                     req.RequestUri!.Host == "api.fiscaldata.treasury.gov" &&
                     req.RequestUri!.AbsolutePath.Contains("rates_of_exchange") &&
                     // Check for the critical filter components in any order
-                    req.RequestUri!.Query.Contains($"filter=record_date:gte:{expectedDateParam},country_currency_desc:eq:{currency.ToUpperInvariant()}") &&
+                    req.RequestUri!.Query.Contains($"filter=record_date:lte:{expectedDateParam},country_currency_desc:eq:{currency.ToUpperInvariant()}") &&
                     // Check for required parameters
                     req.RequestUri!.Query.Contains("fields=") &&
                     req.RequestUri!.Query.Contains("sort=") &&
