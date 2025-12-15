@@ -11,6 +11,13 @@ namespace Wex.CorporatePayments.Application.Services;
 public interface IExchangeRateService
 {
     Task<decimal> GetExchangeRateAsync(string currency, DateTime date, CancellationToken cancellationToken = default);
+    Task<ExchangeRateResult> GetExchangeRateWithDateAsync(string currency, DateTime date, CancellationToken cancellationToken = default);
+}
+
+public class ExchangeRateResult
+{
+    public decimal Rate { get; set; }
+    public DateTime RateDate { get; set; }
 }
 
 public class ExchangeRateService : IExchangeRateService
@@ -27,6 +34,69 @@ public class ExchangeRateService : IExchangeRateService
         _treasuryApiClient = treasuryApiClient;
         _cache = cache;
         _logger = logger;
+    }
+
+    public async Task<ExchangeRateResult> GetExchangeRateWithDateAsync(string currency, DateTime date, CancellationToken cancellationToken = default)
+    {
+        var today = DateTime.Today;
+        var requestedDate = date.Date;
+        
+        // d0: No cache, always fetch from API
+        if (requestedDate == today)
+        {
+            _logger.LogInformation("Fetching current day rate for {Currency} on {Date} (no cache)", currency, requestedDate);
+            var rate = await _treasuryApiClient.GetExchangeRateAsync(currency, requestedDate, cancellationToken);
+            
+            if (!rate.HasValue)
+            {
+                throw new ExchangeRateUnavailableException(currency, requestedDate);
+            }
+            
+            return new ExchangeRateResult { Rate = rate.Value, RateDate = requestedDate };
+        }
+        
+        // For historical dates, use bucket caching
+        var cacheKey = $"exchange_rates_bucket_{currency}";
+        var cachedRates = await GetRatesBucketFromCacheAsync(cacheKey, cancellationToken);
+        
+        if (cachedRates != null)
+        {
+            // Find rate using LINQ - exact date match or most recent prior date
+            var rateResult = FindRateInBucketWithDate(cachedRates, requestedDate);
+            if (rateResult != null)
+            {
+                _logger.LogDebug("Found exchange rate {Rate} for {Currency} on {Date} in bucket cache", 
+                    rateResult.Rate, currency, rateResult.RateDate);
+                return rateResult;
+            }
+        }
+
+        // Cache miss or insufficient data - fetch from API
+        var sixMonthsAgo = today.AddMonths(-ApplicationConstants.ExchangeRate.FallbackMonths);
+        var startDate = requestedDate < sixMonthsAgo ? requestedDate : sixMonthsAgo;
+        
+        _logger.LogInformation("Fetching exchange rates bucket for {Currency} from {StartDate}", currency, startDate);
+        var ratesFromApi = await _treasuryApiClient.GetExchangeRatesRangeAsync(currency, startDate, cancellationToken);
+        
+        if (!ratesFromApi.Any())
+        {
+            throw new ExchangeRateUnavailableException(currency, requestedDate);
+        }
+
+        // Cache the entire bucket
+        await SetRatesBucketCacheAsync(cacheKey, ratesFromApi, cancellationToken);
+        
+        // Find rate in the newly fetched data
+        var finalRateResult = FindRateInBucketWithDate(ratesFromApi, requestedDate);
+        if (finalRateResult == null)
+        {
+            throw new ExchangeRateUnavailableException(currency, requestedDate);
+        }
+        
+        _logger.LogInformation("Retrieved and cached exchange rate bucket for {Currency} with {Count} rates", 
+            currency, ratesFromApi.Count);
+        
+        return finalRateResult;
     }
 
     public async Task<decimal> GetExchangeRateAsync(string currency, DateTime date, CancellationToken cancellationToken = default)
@@ -108,6 +178,29 @@ public class ExchangeRateService : IExchangeRateService
             .FirstOrDefault();
             
         return priorRate?.Rate;
+    }
+
+    private ExchangeRateResult? FindRateInBucketWithDate(List<ExchangeRateDto> rates, DateTime requestedDate)
+    {
+        // Try exact date match first
+        var exactMatch = rates.FirstOrDefault(r => r.Date == requestedDate);
+        if (exactMatch != null)
+        {
+            return new ExchangeRateResult { Rate = exactMatch.Rate, RateDate = exactMatch.Date };
+        }
+        
+        // Find most recent rate before the requested date
+        var priorRate = rates
+            .Where(r => r.Date < requestedDate)
+            .OrderByDescending(r => r.Date)
+            .FirstOrDefault();
+            
+        if (priorRate != null)
+        {
+            return new ExchangeRateResult { Rate = priorRate.Rate, RateDate = priorRate.Date };
+        }
+        
+        return null;
     }
 
     private async Task<List<ExchangeRateDto>?> GetRatesBucketFromCacheAsync(string cacheKey, CancellationToken cancellationToken)

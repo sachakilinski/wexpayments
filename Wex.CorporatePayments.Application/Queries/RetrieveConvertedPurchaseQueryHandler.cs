@@ -52,21 +52,22 @@ public class RetrieveConvertedPurchaseQueryHandler : IRequestHandler<RetrieveCon
         }
 
         // Get exchange rate
-        var exchangeRate = await _exchangeRateService.GetExchangeRateAsync(
+        var exchangeRateResult = await _exchangeRateService.GetExchangeRateWithDateAsync(
             request.TargetCurrency, 
             purchase.TransactionDate, 
             cancellationToken);
 
         // Convert the amount
-        var convertedAmount = ConvertAmount(purchase.OriginalAmount, exchangeRate, request.TargetCurrency);
+        var convertedAmount = ConvertAmount(purchase.OriginalAmount, exchangeRateResult.Rate, request.TargetCurrency);
 
-        _logger.LogInformation("Converted purchase {PurchaseId}: {OriginalAmount} {OriginalCurrency} = {ConvertedAmount} {TargetCurrency} (rate: {ExchangeRate})",
+        _logger.LogInformation("Converted purchase {PurchaseId}: {OriginalAmount} {OriginalCurrency} = {ConvertedAmount} {TargetCurrency} (rate: {ExchangeRate} from {RateDate})",
             purchase.Id,
             purchase.OriginalAmount.Amount,
             purchase.OriginalAmount.Currency,
             convertedAmount.Amount,
             request.TargetCurrency,
-            exchangeRate);
+            exchangeRateResult.Rate,
+            exchangeRateResult.RateDate);
 
         return new RetrieveConvertedPurchaseResponse
         {
@@ -75,8 +76,8 @@ public class RetrieveConvertedPurchaseQueryHandler : IRequestHandler<RetrieveCon
             TransactionDate = purchase.TransactionDate,
             OriginalAmount = purchase.OriginalAmount,
             ConvertedAmount = convertedAmount,
-            ExchangeRateDate = purchase.TransactionDate.ToString("yyyy-MM-dd"),
-            ExchangeRate = exchangeRate
+            ExchangeRateDate = exchangeRateResult.RateDate.ToString("yyyy-MM-dd"),
+            ExchangeRate = exchangeRateResult.Rate
         };
     }
 

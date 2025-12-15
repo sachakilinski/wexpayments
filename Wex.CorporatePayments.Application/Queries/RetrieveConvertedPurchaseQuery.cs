@@ -12,7 +12,7 @@ public record RetrieveConvertedPurchaseQuery : IRequest<RetrieveConvertedPurchas
     public RetrieveConvertedPurchaseQuery(Guid id, string targetCurrency = ApplicationConstants.Currency.Default)
     {
         Id = id;
-        TargetCurrency = targetCurrency.ToUpperInvariant();
+        TargetCurrency = targetCurrency;
     }
 }
 
