@@ -52,9 +52,45 @@ public class StorePurchaseTransactionUseCaseTests
     }
 
     [Fact]
-    public async Task HandleAsync_WithExistingIdempotencyKey_ShouldReturnExistingPurchaseId()
+    public async Task HandleAsync_WithIdenticalContent_ShouldReturnExistingPurchaseId_I01()
     {
-        // Arrange
+        // Arrange - I-01 (Sucesso Idempotente)
+        var existingPurchaseId = Guid.NewGuid();
+        var money = Money.Create(100.50m, "USD");
+        var existingPurchase = new Purchase(
+            "Test Purchase",
+            DateTime.UtcNow,
+            money,
+            "existing-key"
+        );
+        // Use reflection to set the Id property since it has a private setter
+        var idProperty = typeof(Purchase).GetProperty(nameof(Purchase.Id));
+        idProperty?.SetValue(existingPurchase, existingPurchaseId);
+
+        var command = new StorePurchaseCommand
+        {
+            Description = "Test Purchase",
+            TransactionDate = existingPurchase.TransactionDate,
+            Amount = 100.50m,
+            IdempotencyKey = "existing-key"
+        };
+
+        _purchaseRepositoryMock
+            .Setup(r => r.GetByIdempotencyKeyAsync("existing-key", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(existingPurchase);
+
+        // Act
+        var result = await _useCase.HandleAsync(command);
+
+        // Assert
+        Assert.Equal(existingPurchaseId, result);
+        _purchaseRepositoryMock.Verify(r => r.AddAsync(It.IsAny<Purchase>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task HandleAsync_WithDifferentContent_ShouldThrowIdempotencyConflictException_I02()
+    {
+        // Arrange - I-02 (Conflito)
         var existingPurchaseId = Guid.NewGuid();
         var money = Money.Create(50.00m, "USD");
         var existingPurchase = new Purchase(
@@ -69,9 +105,9 @@ public class StorePurchaseTransactionUseCaseTests
 
         var command = new StorePurchaseCommand
         {
-            Description = "Test Purchase",
+            Description = "Different Purchase", // Different description
             TransactionDate = DateTime.UtcNow,
-            Amount = 100.50m,
+            Amount = 100.50m, // Different amount
             IdempotencyKey = "existing-key"
         };
 
@@ -87,9 +123,21 @@ public class StorePurchaseTransactionUseCaseTests
     }
 
     [Fact]
-    public async Task HandleAsync_WithUniqueConstraintViolation_ShouldThrowIdempotencyConflictException()
+    public async Task HandleAsync_WithUniqueConstraintViolation_ShouldReturnExistingPurchaseId_RaceCondition()
     {
-        // Arrange
+        // Arrange - Race condition scenario
+        var existingPurchaseId = Guid.NewGuid();
+        var money = Money.Create(100.50m, "USD");
+        var existingPurchase = new Purchase(
+            "Test Purchase",
+            DateTime.UtcNow,
+            money,
+            "test-key"
+        );
+        // Use reflection to set the Id property since it has a private setter
+        var idProperty = typeof(Purchase).GetProperty(nameof(Purchase.Id));
+        idProperty?.SetValue(existingPurchase, existingPurchaseId);
+
         var command = new StorePurchaseCommand
         {
             Description = "Test Purchase",
@@ -109,12 +157,17 @@ public class StorePurchaseTransactionUseCaseTests
             .Setup(r => r.AddAsync(It.IsAny<Purchase>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(dbUpdateException);
 
-        // Act & Assert
-        var exception = await Assert.ThrowsAsync<IdempotencyConflictException>(
-            () => _useCase.HandleAsync(command));
+        // Setup the second call to return the existing purchase (race condition recovery)
+        _purchaseRepositoryMock
+            .SetupSequence(r => r.GetByIdempotencyKeyAsync("test-key", It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Purchase?)null) // First call returns null
+            .ReturnsAsync(existingPurchase); // Second call returns existing purchase
 
-        Assert.Equal("test-key", exception.IdempotencyKey);
-        Assert.Equal(dbUpdateException, exception.InnerException);
+        // Act
+        var result = await _useCase.HandleAsync(command);
+
+        // Assert
+        Assert.Equal(existingPurchaseId, result);
     }
 
     [Fact]

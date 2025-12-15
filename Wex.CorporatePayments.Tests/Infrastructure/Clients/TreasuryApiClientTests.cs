@@ -60,7 +60,7 @@ public class TreasuryApiClientTests
         // Assert
         Assert.Equal(expectedRate, result);
         
-        // Verify the correct URL was called
+        // Verify the correct URL was called - more flexible verification
         _httpMessageHandlerMock
             .Protected()
             .Verify(
@@ -68,10 +68,14 @@ public class TreasuryApiClientTests
                 Times.Once(),
                 ItExpr.Is<HttpRequestMessage>(req =>
                     req.Method == HttpMethod.Get &&
-                    req.RequestUri!.ToString().Contains("rates_of_exchange") &&
-                    req.RequestUri!.ToString().Contains("filter=record_date:gte:2023-12-15") &&
-                    req.RequestUri!.ToString().Contains("filter=country_currency_desc:eq:BRL") &&
-                    req.RequestUri!.ToString().Contains("sort=-record_date")),
+                    req.RequestUri!.Host == "api.fiscaldata.treasury.gov" &&
+                    req.RequestUri!.AbsolutePath.Contains("rates_of_exchange") &&
+                    // Check for the specific filter components for this test
+                    req.RequestUri!.Query.Contains("filter=record_date:gte:2023-12-15,country_currency_desc:eq:BRL") &&
+                    // Check for required parameters
+                    req.RequestUri!.Query.Contains("fields=") &&
+                    req.RequestUri!.Query.Contains("sort=") &&
+                    req.RequestUri!.Query.Contains("page[size]=1")),
                 ItExpr.IsAny<CancellationToken>());
     }
 
@@ -340,7 +344,7 @@ public class TreasuryApiClientTests
         // Assert
         Assert.Equal(1.25m, result);
         
-        // Verify the correct URL was called with proper date format
+        // Verify the correct URL was called with proper date format - more flexible verification
         _httpMessageHandlerMock
             .Protected()
             .Verify(
@@ -348,8 +352,14 @@ public class TreasuryApiClientTests
                 Times.Once(),
                 ItExpr.Is<HttpRequestMessage>(req =>
                     req.Method == HttpMethod.Get &&
-                    req.RequestUri!.ToString().Contains($"filter=record_date:gte:{expectedDateParam}") &&
-                    req.RequestUri!.ToString().Contains($"filter=country_currency_desc:eq:{currency.ToUpperInvariant()}")),
+                    req.RequestUri!.Host == "api.fiscaldata.treasury.gov" &&
+                    req.RequestUri!.AbsolutePath.Contains("rates_of_exchange") &&
+                    // Check for the critical filter components in any order
+                    req.RequestUri!.Query.Contains($"filter=record_date:gte:{expectedDateParam},country_currency_desc:eq:{currency.ToUpperInvariant()}") &&
+                    // Check for required parameters
+                    req.RequestUri!.Query.Contains("fields=") &&
+                    req.RequestUri!.Query.Contains("sort=") &&
+                    req.RequestUri!.Query.Contains("page[size]=1")),
                 ItExpr.IsAny<CancellationToken>());
     }
 

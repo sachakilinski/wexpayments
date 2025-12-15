@@ -30,8 +30,25 @@ public class StorePurchaseTransactionUseCase : IStorePurchaseTransactionUseCase
             var existingPurchase = await _purchaseRepository.GetByIdempotencyKeyAsync(effectiveIdempotencyKey, cancellationToken);
             if (existingPurchase != null)
             {
-                // Throw exception for controller to handle and return 409 Conflict
-                throw new IdempotencyConflictException(effectiveIdempotencyKey);
+                // Create a temporary purchase for content comparison
+                var comparisonAmount = Money.Create(command.Amount, "USD");
+                var newPurchase = new Purchase(
+                    command.Description,
+                    command.TransactionDate,
+                    comparisonAmount,
+                    effectiveIdempotencyKey
+                );
+
+                if (ArePurchasesIdentical(existingPurchase, newPurchase))
+                {
+                    // I-01 (Sucesso Idempotente): Return existing purchase ID for identical content
+                    return existingPurchase.Id;
+                }
+                else
+                {
+                    // I-02 (Conflito): Throw conflict exception for different content
+                    throw new IdempotencyConflictException(effectiveIdempotencyKey);
+                }
             }
         }
 
@@ -64,6 +81,14 @@ public class StorePurchaseTransactionUseCase : IStorePurchaseTransactionUseCase
         }
 
         return purchase.Id;
+    }
+
+    private static bool ArePurchasesIdentical(Purchase existing, Purchase newPurchase)
+    {
+        return existing.Description == newPurchase.Description &&
+               existing.TransactionDate == newPurchase.TransactionDate &&
+               existing.OriginalAmount.Amount == newPurchase.OriginalAmount.Amount &&
+               existing.OriginalAmount.Currency == newPurchase.OriginalAmount.Currency;
     }
 
     private static bool IsUniqueConstraintViolation(DbUpdateException ex)

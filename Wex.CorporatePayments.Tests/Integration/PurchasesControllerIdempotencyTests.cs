@@ -119,9 +119,9 @@ public class PurchasesControllerIdempotencyTests : IClassFixture<WebApplicationF
     }
 
     [Fact]
-    public async Task CreatePurchase_WithSameIdempotencyKey_ShouldReturn409Conflict()
+    public async Task CreatePurchase_WithSameIdempotencyKeyAndIdenticalContent_ShouldReturn201Created_I01()
     {
-        // Arrange
+        // Arrange - I-01 (Sucesso Idempotente)
         var client = _factory.CreateClient();
         var idempotencyKey = $"test-key-{Guid.NewGuid()}";
         
@@ -162,11 +162,11 @@ public class PurchasesControllerIdempotencyTests : IClassFixture<WebApplicationF
         // Avoid reading response content to prevent PipeWriter serialization error
         // Only verify status code for integration tests
 
-        // Act - Second request with same idempotency key should return 409
+        // Act - Second request with identical content should return 201 (idempotent)
         var secondResponse = await client.PostAsync("/api/purchases", content);
 
-        // Assert - Second request should return 409
-        Assert.Equal(System.Net.HttpStatusCode.Conflict, secondResponse.StatusCode);
+        // Assert - Second request should return 201 (idempotent success)
+        Assert.Equal(System.Net.HttpStatusCode.Created, secondResponse.StatusCode);
         
         // Avoid reading response content to prevent PipeWriter serialization error
         // Only verify status code for integration tests
@@ -179,6 +179,81 @@ public class PurchasesControllerIdempotencyTests : IClassFixture<WebApplicationF
             
             Assert.Single(purchases);
             Assert.Equal(idempotencyKey, purchases.First().IdempotencyKey);
+        }
+    }
+
+    [Fact]
+    public async Task CreatePurchase_WithSameIdempotencyKeyButDifferentContent_ShouldReturn409Conflict_I02()
+    {
+        // Arrange - I-02 (Conflito)
+        var client = _factory.CreateClient();
+        var idempotencyKey = $"test-key-{Guid.NewGuid()}";
+        
+        // Reset database to ensure clean state
+        ResetDatabase();
+
+        var firstCommand = new StorePurchaseCommand
+        {
+            Description = "Test Purchase",
+            TransactionDate = DateTime.UtcNow,
+            Amount = 100.50m,
+            IdempotencyKey = idempotencyKey
+        };
+
+        var firstJson = JsonSerializer.Serialize(firstCommand);
+        var firstContent = new StringContent(firstJson, System.Text.Encoding.UTF8, "application/json");
+
+        // Act - First request should succeed
+        var firstResponse = await client.PostAsync("/api/purchases", firstContent);
+        
+        // Assert - First request should return 201
+        Assert.Equal(System.Net.HttpStatusCode.Created, firstResponse.StatusCode);
+        
+        // Force database sync by checking the data directly
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var existingPurchase = await context.Purchases
+                .AsNoTracking()
+                .FirstOrDefaultAsync(p => p.IdempotencyKey == idempotencyKey);
+            
+            Assert.NotNull(existingPurchase); // Verify first purchase exists
+        }
+        
+        // Add a longer delay to ensure transaction is fully committed
+        await Task.Delay(500);
+        
+        // Arrange - Second request with same idempotency key but different content
+        var secondCommand = new StorePurchaseCommand
+        {
+            Description = "Different Purchase", // Different description
+            TransactionDate = DateTime.UtcNow,
+            Amount = 200.75m, // Different amount
+            IdempotencyKey = idempotencyKey // Same idempotency key
+        };
+
+        var secondJson = JsonSerializer.Serialize(secondCommand);
+        var secondContent = new StringContent(secondJson, System.Text.Encoding.UTF8, "application/json");
+
+        // Act - Second request with different content should return 409
+        var secondResponse = await client.PostAsync("/api/purchases", secondContent);
+
+        // Assert - Second request should return 409 (conflict)
+        Assert.Equal(System.Net.HttpStatusCode.Conflict, secondResponse.StatusCode);
+        
+        // Avoid reading response content to prevent PipeWriter serialization error
+        // Only verify status code for integration tests
+        
+        // Verify only one purchase was created in the database (the first one)
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var purchases = await context.Purchases.ToListAsync();
+            
+            Assert.Single(purchases);
+            Assert.Equal(idempotencyKey, purchases.First().IdempotencyKey);
+            Assert.Equal("Test Purchase", purchases.First().Description); // First purchase content
+            Assert.Equal(100.50m, purchases.First().OriginalAmount.Amount); // First purchase amount
         }
     }
 
