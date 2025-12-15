@@ -18,13 +18,20 @@ public class StorePurchaseTransactionUseCase : IStorePurchaseTransactionUseCase
 
     public async Task<Guid> HandleAsync(StorePurchaseCommand command, CancellationToken cancellationToken = default)
     {
+        // Normalize empty string idempotency keys to null
+        var normalizedIdempotencyKey = string.IsNullOrEmpty(command.IdempotencyKey) ? null : command.IdempotencyKey;
+        
+        // For null idempotency keys, generate a unique GUID to avoid SQLite NULL uniqueness issues
+        var effectiveIdempotencyKey = normalizedIdempotencyKey ?? $"no-key-{Guid.NewGuid()}";
+        
         // Check for idempotency if key is provided
-        if (!string.IsNullOrEmpty(command.IdempotencyKey))
+        if (normalizedIdempotencyKey != null)
         {
-            var existingPurchase = await _purchaseRepository.GetByIdempotencyKeyAsync(command.IdempotencyKey, cancellationToken);
+            var existingPurchase = await _purchaseRepository.GetByIdempotencyKeyAsync(effectiveIdempotencyKey, cancellationToken);
             if (existingPurchase != null)
             {
-                return existingPurchase.Id; // Return existing purchase for idempotency
+                // Throw exception for controller to handle and return 409 Conflict
+                throw new IdempotencyConflictException(effectiveIdempotencyKey);
             }
         }
 
@@ -34,7 +41,7 @@ public class StorePurchaseTransactionUseCase : IStorePurchaseTransactionUseCase
             command.Description,
             command.TransactionDate,
             originalAmount,
-            command.IdempotencyKey
+            effectiveIdempotencyKey
         );
 
         try
@@ -45,7 +52,15 @@ public class StorePurchaseTransactionUseCase : IStorePurchaseTransactionUseCase
         catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
         {
             // Handle unique constraint violation on IdempotencyKey
-            throw new IdempotencyConflictException(command.IdempotencyKey!, ex);
+            // This can happen in race conditions between check and insert
+            // Try to find the existing purchase and return its ID
+            var existingPurchase = await _purchaseRepository.GetByIdempotencyKeyAsync(effectiveIdempotencyKey, cancellationToken);
+            if (existingPurchase != null)
+            {
+                return existingPurchase.Id;
+            }
+            // If we still can't find it, throw the original exception
+            throw new IdempotencyConflictException(effectiveIdempotencyKey, ex);
         }
 
         return purchase.Id;

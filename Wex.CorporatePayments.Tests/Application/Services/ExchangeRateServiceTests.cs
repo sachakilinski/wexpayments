@@ -43,10 +43,11 @@ public class ExchangeRateServiceTests
             new() { Date = date, Rate = cachedRate }
         };
         var serializedRates = System.Text.Json.JsonSerializer.Serialize(cachedRates);
+        var serializedBytes = System.Text.Encoding.UTF8.GetBytes(serializedRates);
 
         _cacheMock
-            .Setup(c => c.GetStringAsync(cacheKey, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(serializedRates);
+            .Setup(c => c.GetAsync(cacheKey, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(serializedBytes);
 
         // Act
         var result = await _exchangeRateService.GetExchangeRateAsync(currency, date);
@@ -54,7 +55,7 @@ public class ExchangeRateServiceTests
         // Assert
         Assert.Equal(cachedRate, result);
         _treasuryApiClientMock.Verify(c => c.GetExchangeRateAsync(It.IsAny<string>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()), Times.Never);
-        _cacheMock.Verify(c => c.SetStringAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<DistributedCacheEntryOptions>(), It.IsAny<CancellationToken>()), Times.Never);
+        _cacheMock.Verify(c => c.SetAsync(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<DistributedCacheEntryOptions>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -67,8 +68,8 @@ public class ExchangeRateServiceTests
         var cacheKey = $"exchange_rates_bucket_{currency}";
 
         _cacheMock
-            .Setup(c => c.GetStringAsync(cacheKey, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((string?)null);
+            .Setup(c => c.GetAsync(cacheKey, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((byte[]?)null);
 
         var apiRates = new List<ExchangeRateDto>
         {
@@ -85,7 +86,7 @@ public class ExchangeRateServiceTests
         // Assert
         Assert.Equal(rate, result);
         _treasuryApiClientMock.Verify(c => c.GetExchangeRatesRangeAsync(currency, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()), Times.Once);
-        _cacheMock.Verify(c => c.SetStringAsync(cacheKey, It.IsAny<string>(), It.IsAny<DistributedCacheEntryOptions>(), It.IsAny<CancellationToken>()), Times.Once);
+        _cacheMock.Verify(c => c.SetAsync(cacheKey, It.IsAny<byte[]>(), It.IsAny<DistributedCacheEntryOptions>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -99,8 +100,8 @@ public class ExchangeRateServiceTests
         var cacheKey = $"exchange_rates_bucket_{currency}";
 
         _cacheMock
-            .Setup(c => c.GetStringAsync(cacheKey, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((string?)null);
+            .Setup(c => c.GetAsync(cacheKey, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((byte[]?)null);
 
         // API returns rates with fallback date
         var apiRates = new List<ExchangeRateDto>
@@ -118,7 +119,7 @@ public class ExchangeRateServiceTests
         // Assert
         Assert.Equal(rate, result);
         _treasuryApiClientMock.Verify(c => c.GetExchangeRatesRangeAsync(currency, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()), Times.Once);
-        _cacheMock.Verify(c => c.SetStringAsync(cacheKey, It.IsAny<string>(), It.IsAny<DistributedCacheEntryOptions>(), It.IsAny<CancellationToken>()), Times.Once);
+        _cacheMock.Verify(c => c.SetAsync(cacheKey, It.IsAny<byte[]>(), It.IsAny<DistributedCacheEntryOptions>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -132,8 +133,8 @@ public class ExchangeRateServiceTests
         var cacheKey = $"exchange_rates_bucket_{currency}";
 
         _cacheMock
-            .Setup(c => c.GetStringAsync(cacheKey, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((string?)null);
+            .Setup(c => c.GetAsync(cacheKey, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((byte[]?)null);
 
         // API returns rates with multiple dates, first available should be used
         var apiRates = new List<ExchangeRateDto>
@@ -152,7 +153,7 @@ public class ExchangeRateServiceTests
         // Assert
         Assert.Equal(rate, result);
         _treasuryApiClientMock.Verify(c => c.GetExchangeRatesRangeAsync(currency, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()), Times.Once);
-        _cacheMock.Verify(c => c.SetStringAsync(cacheKey, It.IsAny<string>(), It.IsAny<DistributedCacheEntryOptions>(), It.IsAny<CancellationToken>()), Times.Once);
+        _cacheMock.Verify(c => c.SetAsync(cacheKey, It.IsAny<byte[]>(), It.IsAny<DistributedCacheEntryOptions>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -164,8 +165,8 @@ public class ExchangeRateServiceTests
         var cacheKey = $"exchange_rates_bucket_{currency}";
 
         _cacheMock
-            .Setup(c => c.GetStringAsync(cacheKey, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((string?)null);
+            .Setup(c => c.GetAsync(cacheKey, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((byte[]?)null);
 
         // API returns empty rates list
         var apiRates = new List<ExchangeRateDto>();
@@ -181,7 +182,8 @@ public class ExchangeRateServiceTests
         Assert.Equal(currency, exception.Currency);
         Assert.Equal(date, exception.Date);
         _treasuryApiClientMock.Verify(c => c.GetExchangeRatesRangeAsync(currency, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()), Times.Once);
-        _cacheMock.Verify(c => c.SetStringAsync(cacheKey, It.IsAny<string>(), It.IsAny<DistributedCacheEntryOptions>(), It.IsAny<CancellationToken>()), Times.Once);
+        // When no rates are found, SetAsync should not be called because exception is thrown before caching
+        _cacheMock.Verify(c => c.SetAsync(cacheKey, It.IsAny<byte[]>(), It.IsAny<DistributedCacheEntryOptions>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -195,8 +197,8 @@ public class ExchangeRateServiceTests
         var cacheKey = $"exchange_rates_bucket_{currency}";
 
         _cacheMock
-            .Setup(c => c.GetStringAsync(cacheKey, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((string?)null);
+            .Setup(c => c.GetAsync(cacheKey, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((byte[]?)null);
 
         // API returns rates with 6-month-old rate
         var apiRates = new List<ExchangeRateDto>
@@ -214,7 +216,7 @@ public class ExchangeRateServiceTests
         // Assert
         Assert.Equal(rate, result);
         _treasuryApiClientMock.Verify(c => c.GetExchangeRatesRangeAsync(currency, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()), Times.Once);
-        _cacheMock.Verify(c => c.SetStringAsync(cacheKey, It.IsAny<string>(), It.IsAny<DistributedCacheEntryOptions>(), It.IsAny<CancellationToken>()), Times.Once);
+        _cacheMock.Verify(c => c.SetAsync(cacheKey, It.IsAny<byte[]>(), It.IsAny<DistributedCacheEntryOptions>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -226,8 +228,8 @@ public class ExchangeRateServiceTests
         var cacheKey = $"exchange_rates_bucket_{currency}";
 
         _cacheMock
-            .Setup(c => c.GetStringAsync(cacheKey, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((string?)null);
+            .Setup(c => c.GetAsync(cacheKey, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((byte[]?)null);
 
         // API returns empty rates list (no rates within 6 months)
         var apiRates = new List<ExchangeRateDto>();
@@ -237,11 +239,14 @@ public class ExchangeRateServiceTests
             .ReturnsAsync(apiRates);
 
         // Act & Assert
-        await Assert.ThrowsAsync<ExchangeRateUnavailableException>(
+        var exception = await Assert.ThrowsAsync<ExchangeRateUnavailableException>(
             () => _exchangeRateService.GetExchangeRateAsync(currency, date));
 
+        Assert.Equal(currency, exception.Currency);
+        Assert.Equal(date, exception.Date);
         _treasuryApiClientMock.Verify(c => c.GetExchangeRatesRangeAsync(currency, It.IsAny<DateTime>(), It.IsAny<CancellationToken>()), Times.Once);
-        _cacheMock.Verify(c => c.SetStringAsync(cacheKey, It.IsAny<string>(), It.IsAny<DistributedCacheEntryOptions>(), It.IsAny<CancellationToken>()), Times.Once);
+        // When rate is older than 6 months, SetAsync should not be called because exception is thrown before caching
+        _cacheMock.Verify(c => c.SetAsync(cacheKey, It.IsAny<byte[]>(), It.IsAny<DistributedCacheEntryOptions>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -255,7 +260,7 @@ public class ExchangeRateServiceTests
 
         // Cache throws exception on get
         _cacheMock
-            .Setup(c => c.GetStringAsync(cacheKey, It.IsAny<CancellationToken>()))
+            .Setup(c => c.GetAsync(cacheKey, It.IsAny<CancellationToken>()))
             .ThrowsAsync(new Exception("Cache error"));
 
         var apiRates = new List<ExchangeRateDto>
@@ -285,8 +290,8 @@ public class ExchangeRateServiceTests
         var cacheKey = $"exchange_rates_bucket_{currency}";
 
         _cacheMock
-            .Setup(c => c.GetStringAsync(cacheKey, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((string?)null);
+            .Setup(c => c.GetAsync(cacheKey, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((byte[]?)null);
 
         var apiRates = new List<ExchangeRateDto>
         {
@@ -299,7 +304,7 @@ public class ExchangeRateServiceTests
 
         // Cache throws exception on set
         _cacheMock
-            .Setup(c => c.SetStringAsync(cacheKey, It.IsAny<string>(), It.IsAny<DistributedCacheEntryOptions>(), It.IsAny<CancellationToken>()))
+            .Setup(c => c.SetAsync(cacheKey, It.IsAny<byte[]>(), It.IsAny<DistributedCacheEntryOptions>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new Exception("Cache set error"));
 
         // Act
@@ -323,8 +328,8 @@ public class ExchangeRateServiceTests
         var cacheKey = $"exchange_rates_bucket_{currency}";
 
         _cacheMock
-            .Setup(c => c.GetStringAsync(cacheKey, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((string?)null);
+            .Setup(c => c.GetAsync(cacheKey, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((byte[]?)null);
 
         var apiRates = new List<ExchangeRateDto>
         {

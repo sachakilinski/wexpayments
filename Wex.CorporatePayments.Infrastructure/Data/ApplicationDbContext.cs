@@ -44,8 +44,7 @@ public class ApplicationDbContext : DbContext
             // CRITICAL: Unique index on IdempotencyKey for concurrency protection
             entity.HasIndex(e => e.IdempotencyKey)
                 .IsUnique()
-                .HasDatabaseName("IX_Purchases_IdempotencyKey")
-                .HasFilter("IdempotencyKey IS NOT NULL");
+                .HasDatabaseName("IX_Purchases_IdempotencyKey");
         });
     }
 }

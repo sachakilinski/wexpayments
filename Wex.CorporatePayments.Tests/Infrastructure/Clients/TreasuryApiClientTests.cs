@@ -20,6 +20,7 @@ public class TreasuryApiClientTests
         _httpClient = new HttpClient(_httpMessageHandlerMock.Object);
         _loggerMock = new Mock<ILogger<TreasuryApiClient>>();
         
+        // Don't set BaseAddress and headers here - the TreasuryApiClient constructor will set them
         _treasuryApiClient = new TreasuryApiClient(_httpClient, _loggerMock.Object);
     }
 
@@ -68,7 +69,7 @@ public class TreasuryApiClientTests
                 ItExpr.Is<HttpRequestMessage>(req =>
                     req.Method == HttpMethod.Get &&
                     req.RequestUri!.ToString().Contains("rates_of_exchange") &&
-                    req.RequestUri!.ToString().Contains("filter=record_date:gte:2023-12-01") &&
+                    req.RequestUri!.ToString().Contains("filter=record_date:gte:2023-12-15") &&
                     req.RequestUri!.ToString().Contains("filter=country_currency_desc:eq:BRL") &&
                     req.RequestUri!.ToString().Contains("sort=-record_date")),
                 ItExpr.IsAny<CancellationToken>());
@@ -303,9 +304,9 @@ public class TreasuryApiClientTests
     }
 
     [Theory]
-    [InlineData("BRL", "2023-12-15", "2023-12-01")]
-    [InlineData("EUR", "2023-06-30", "2023-06-01")]
-    [InlineData("JPY", "2023-01-01", "2022-12-01")]
+    [InlineData("BRL", "2023-12-15", "2023-12-15")]
+    [InlineData("EUR", "2023-06-30", "2023-06-30")]
+    [InlineData("JPY", "2023-01-01", "2023-01-01")]
     public async Task GetExchangeRateAsync_WithDifferentDatesAndCurrencies_ShouldBuildCorrectUrl(
         string currency, DateTime date, string expectedDateParam)
     {

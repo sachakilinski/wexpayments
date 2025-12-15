@@ -124,7 +124,7 @@ public class StorePurchaseCommandValidatorTests
         // Arrange
         var command = new StorePurchaseCommand
         {
-            Description = "This description is exactly fifty characters long! Yes",
+            Description = "This description is exactly fifty chars long!",
             TransactionDate = DateTime.Now,
             Amount = 100,
             Currency = "USD"

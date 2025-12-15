@@ -21,7 +21,12 @@ public class PurchaseRepository : IPurchaseRepository
 
     public async Task<Purchase?> GetByIdempotencyKeyAsync(string idempotencyKey, CancellationToken cancellationToken = default)
     {
+        // Force a fresh query to avoid caching issues with separate DbContext instances
+        _context.ChangeTracker.Clear();
+        
         return await _context.Purchases
+            .AsNoTracking()
+            .IgnoreQueryFilters()
             .FirstOrDefaultAsync(p => p.IdempotencyKey == idempotencyKey, cancellationToken);
     }
 

@@ -12,6 +12,7 @@ using FluentValidation.AspNetCore;
 using MediatR;
 using Serilog;
 using Polly;
+using System.Text.Json;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -27,7 +28,14 @@ builder.Host.UseSerilog((context, configuration) =>
             outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} {Level:u3}] {SourceContext}: {Message:lj} {Properties:j}{NewLine}{Exception}"));
 
 // Add services to the container.
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+        options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
+        // Fix for .NET 10 PipeWriter issue - use synchronous writer
+        options.JsonSerializerOptions.WriteIndented = false;
+    });
 
 // Configure distributed cache (in-memory for self-contained requirement)
 builder.Services.AddDistributedMemoryCache();

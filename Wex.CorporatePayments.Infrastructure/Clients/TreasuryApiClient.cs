@@ -6,6 +6,7 @@ using Polly.CircuitBreaker;
 using Polly.Retry;
 using Wex.CorporatePayments.Application.DTOs;
 using Wex.CorporatePayments.Application.Interfaces;
+using System.Text.Json.Serialization;
 
 namespace Wex.CorporatePayments.Infrastructure.Clients;
 
@@ -56,13 +57,13 @@ public class TreasuryApiClient : ITreasuryApiClient
     {
         try
         {
-            // Treasury API expects date in YYYY-MM format for monthly rates
-            var dateParam = date.ToString("yyyy-MM");
+            // Treasury API expects date in YYYY-MM-DD format for daily rates
+            var dateParam = date.ToString("yyyy-MM-dd");
             
             // Build the request URL for Treasury API
             var requestUrl = $"/services/api/fiscal_service/v1/accounting/od/rates_of_exchange" +
                            $"?fields=country_currency_desc,exchange_rate,record_date" +
-                           $"&filter=record_date:gte:{dateParam}-01" +
+                           $"&filter=record_date:gte:{dateParam}" +
                            $"&filter=country_currency_desc:eq:{currency}" +
                            $"&sort=-record_date" +
                            $"&page[size]=1";
@@ -140,11 +141,11 @@ public class TreasuryApiClient : ITreasuryApiClient
             });
 
             var rates = treasuryResponse?.Data?
-                .Where(d => !string.IsNullOrEmpty(d.CountryCurrencyDesc))
+                .Where(d => !string.IsNullOrEmpty(d.CountryCurrencyDesc) && d.ExchangeRate.HasValue)
                 .Select(d => new ExchangeRateDto
                 {
                     Currency = d.CountryCurrencyDesc,
-                    Rate = d.ExchangeRate,
+                    Rate = d.ExchangeRate!.Value,
                     Date = DateTime.Parse(d.RecordDate),
                     RecordDate = DateTime.Parse(d.RecordDate)
                 })
@@ -181,12 +182,18 @@ public class TreasuryApiClient : ITreasuryApiClient
 // DTOs for Treasury API response
 public class TreasuryApiResponse
 {
+    [JsonPropertyName("data")]
     public List<TreasuryRateData> Data { get; set; } = new();
 }
 
 public class TreasuryRateData
 {
+    [JsonPropertyName("country_currency_desc")]
     public string CountryCurrencyDesc { get; set; } = string.Empty;
-    public decimal ExchangeRate { get; set; }
+    
+    [JsonPropertyName("exchange_rate")]
+    public decimal? ExchangeRate { get; set; }
+    
+    [JsonPropertyName("record_date")]
     public string RecordDate { get; set; } = string.Empty;
 }
