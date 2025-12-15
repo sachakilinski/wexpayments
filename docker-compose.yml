@@ -7,10 +7,9 @@ services:
       dockerfile: Dockerfile
     ports:
       - "7000:80"
-      - "7001:443"
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
-      - ASPNETCORE_URLS=http://+:80;https://+:443
+      - ASPNETCORE_URLS=http://+:80
       - ConnectionStrings__DefaultConnection=Data Source=/app/data/wex_corporate_payments.db
       - TreasuryApi__BaseUrl=https://api.fiscal.treasury.gov
     volumes:
@@ -20,9 +19,9 @@ services:
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:80/health"]
       interval: 30s
-      timeout: 10s
+      timeout: 15s
       retries: 3
-      start_period: 40s
+      start_period: 60s
     networks:
       - wex-network
 

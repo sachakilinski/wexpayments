@@ -1,0 +1,157 @@
+{
+  "info": {
+    "_postman_id": "wex-corporate-payments-api",
+    "name": "Wex Corporate Payments API",
+    "description": "Collection for testing Wex Corporate Payments API endpoints",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health Checks",
+      "item": [
+        {
+          "name": "Health Check - Full",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Health Check - Ready",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health/ready",
+              "host": ["{{baseUrl}}"],
+              "path": ["health", "ready"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Health Check - Live",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health/live",
+              "host": ["{{baseUrl}}"],
+              "path": ["health", "live"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Purchases",
+      "item": [
+        {
+          "name": "Create Purchase",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Office Supplies Purchase\",\n  \"transactionDate\": \"2025-12-14T10:30:00Z\",\n  \"amount\": 150.75,\n  \"currency\": \"USD\",\n  \"idempotencyKey\": \"{{$randomUUID}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/purchases",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "purchases"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Purchase - EUR",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Software License\",\n  \"transactionDate\": \"2025-12-14T14:20:00Z\",\n  \"amount\": 299.99,\n  \"currency\": \"EUR\",\n  \"idempotencyKey\": \"{{$randomUUID}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/purchases",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "purchases"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Purchase by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/purchases/{{purchaseId}}?currency=USD",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "purchases", "{{purchaseId}}"],
+              "query": [
+                {
+                  "key": "currency",
+                  "value": "USD"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:7000",
+      "type": "string"
+    },
+    {
+      "key": "purchaseId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "event": [
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Store purchaseId from create purchase response",
+          "if (pm.response.code === 201 && pm.request.method === 'POST') {",
+          "    const response = pm.response.json();",
+          "    if (response.id) {",
+          "        pm.collectionVariables.set('purchaseId', response.id);",
+          "        console.log('Stored purchaseId:', response.id);",
+          "    }",
+          "}",
+          "",
+          "// Basic response validation",
+          "pm.test('Status code is successful', function () {",
+          "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 409]);",
+          "});"
+        ]
+      }
+    }
+  ]
+}

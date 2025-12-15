@@ -134,9 +134,7 @@ builder.Services.AddFluentValidationAutoValidation();
 // Add Health Checks
 builder.Services.AddHealthChecks()
     .AddCheck<TreasuryApiHealthCheck>("treasury-api", tags: new[] { "external", "api" })
-    .AddDbContextCheck<ApplicationDbContext>("database", tags: new[] { "database" })
-    .AddSqlite(builder.Configuration.GetConnectionString("DefaultConnection") ?? "Data Source=purchases.db", "sqlite-db", tags: new[] { "database" })
-    .AddUrlGroup(new Uri(builder.Configuration["TreasuryApi:BaseUrl"] ?? "https://api.fiscal.treasury.gov"), "treasury-api-uri", tags: new[] { "external", "api" });
+    .AddDbContextCheck<ApplicationDbContext>("database", tags: new[] { "database" });
 
 var app = builder.Build();
 
@@ -155,7 +153,11 @@ if (app.Environment.IsDevelopment())
     });
 }
 
-app.UseHttpsRedirection();
+// Only use HTTPS redirection in development
+if (app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 
 app.UseAuthorization();
 

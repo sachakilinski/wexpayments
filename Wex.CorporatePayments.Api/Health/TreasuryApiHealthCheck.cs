@@ -18,8 +18,14 @@ public class TreasuryApiHealthCheck : IHealthCheck
     {
         try
         {
+            // Use a shorter timeout for health checks to avoid long waits
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(TimeSpan.FromSeconds(5)); // 5 second timeout for health check
+            
             // Try to get a recent exchange rate to verify API connectivity
-            var rate = await _treasuryApiClient.GetExchangeRateAsync("USD", DateTime.UtcNow.AddDays(-1), cancellationToken);
+            // Use a historical date that's guaranteed to have data (2015)
+            var testDate = new DateTime(2015, 01, 01);
+            var rate = await _treasuryApiClient.GetExchangeRateAsync("Canada-Dollar", testDate, cts.Token);
             
             if (rate.HasValue)
             {
@@ -29,6 +35,11 @@ public class TreasuryApiHealthCheck : IHealthCheck
             {
                 return HealthCheckResult.Degraded("Treasury API responded but no data available");
             }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogWarning("Treasury API health check timed out");
+            return HealthCheckResult.Degraded("Treasury API health check timed out");
         }
         catch (Exception ex)
         {

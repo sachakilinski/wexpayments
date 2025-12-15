@@ -68,19 +68,35 @@ public class TreasuryApiClient : ITreasuryApiClient
                            $"&sort=-record_date" +
                            $"&page[size]=1";
 
+            var fullUrl = $"{_httpClient.BaseAddress}{requestUrl}";
+            _logger.LogInformation("Calling Treasury API: {FullUrl}", fullUrl);
+
             var response = await _circuitBreakerPolicy.ExecuteAsync(() =>
                 _retryPolicy.ExecuteAsync(() =>
                     _httpClient.GetAsync(requestUrl, cancellationToken)));
 
+            _logger.LogInformation("Treasury API response status: {StatusCode}", response.StatusCode);
+
             response.EnsureSuccessStatusCode();
 
             var content = await response.Content.ReadAsStringAsync(cancellationToken);
+            _logger.LogInformation("Treasury API response content: {Content}", content);
+
             var treasuryResponse = JsonSerializer.Deserialize<TreasuryApiResponse>(content, new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true
             });
 
-            var rate = treasuryResponse?.Data?.FirstOrDefault()?.ExchangeRate;
+            // Parse the exchange rate from string to decimal
+            decimal? rate = null;
+            var firstRecord = treasuryResponse?.Data?.FirstOrDefault();
+            if (firstRecord != null && !string.IsNullOrEmpty(firstRecord.ExchangeRate))
+            {
+                if (decimal.TryParse(firstRecord.ExchangeRate, out var parsedRate))
+                {
+                    rate = parsedRate;
+                }
+            }
             
             if (rate.HasValue)
             {
@@ -141,11 +157,11 @@ public class TreasuryApiClient : ITreasuryApiClient
             });
 
             var rates = treasuryResponse?.Data?
-                .Where(d => !string.IsNullOrEmpty(d.CountryCurrencyDesc) && d.ExchangeRate.HasValue)
+                .Where(d => !string.IsNullOrEmpty(d.CountryCurrencyDesc) && !string.IsNullOrEmpty(d.ExchangeRate))
                 .Select(d => new ExchangeRateDto
                 {
                     Currency = d.CountryCurrencyDesc,
-                    Rate = d.ExchangeRate!.Value,
+                    Rate = decimal.TryParse(d.ExchangeRate, out var parsedRate) ? parsedRate : 0,
                     Date = DateTime.Parse(d.RecordDate),
                     RecordDate = DateTime.Parse(d.RecordDate)
                 })
@@ -192,7 +208,7 @@ public class TreasuryRateData
     public string CountryCurrencyDesc { get; set; } = string.Empty;
     
     [JsonPropertyName("exchange_rate")]
-    public decimal? ExchangeRate { get; set; }
+    public string ExchangeRate { get; set; } = string.Empty;
     
     [JsonPropertyName("record_date")]
     public string RecordDate { get; set; } = string.Empty;
