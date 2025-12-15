@@ -64,8 +64,7 @@ public class TreasuryApiClient : ITreasuryApiClient
             // Build the request URL for Treasury API
             var requestUrl = $"/services/api/fiscal_service/v1/accounting/od/rates_of_exchange" +
                            $"?fields=country_currency_desc,exchange_rate,record_date" +
-                           $"&filter=record_date:gte:{dateParam}" +
-                           $"&filter=country_currency_desc:eq:{currency}" +
+                           $"&filter=record_date:gte:{dateParam},country_currency_desc:eq:{currency}" +
                            $"&sort=-record_date" +
                            $"&page[size]=1";
 
@@ -140,8 +139,7 @@ public class TreasuryApiClient : ITreasuryApiClient
             var startDateParam = startDate.ToString("yyyy-MM-dd");
             var requestUrl = $"/services/api/fiscal_service/v1/accounting/od/rates_of_exchange" +
                            $"?fields=country_currency_desc,exchange_rate,record_date" +
-                           $"&filter=country_currency_desc:eq:{currency}" +
-                           $"&filter=record_date:gte:{startDateParam}" +
+                           $"&filter=country_currency_desc:eq:{currency},record_date:gte:{startDateParam}" +
                            $"&sort=-record_date" +
                            $"&page[size]=1000"; // Get up to 1000 records
 
