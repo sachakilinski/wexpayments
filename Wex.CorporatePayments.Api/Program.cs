@@ -13,6 +13,7 @@ using MediatR;
 using Serilog;
 using Polly;
 using System.Text.Json;
+using Wex.CorporatePayments.Api.Health;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -87,6 +88,13 @@ builder.Services.AddMediatR(cfg => {
 builder.Services.AddValidatorsFromAssemblyContaining<StorePurchaseCommandValidator>();
 builder.Services.AddFluentValidationAutoValidation();
 
+// Add Health Checks
+builder.Services.AddHealthChecks()
+    .AddCheck<TreasuryApiHealthCheck>("treasury-api", tags: new[] { "external", "api" })
+    .AddDbContextCheck<ApplicationDbContext>("database", tags: new[] { "database" })
+    .AddSqlite(builder.Configuration.GetConnectionString("DefaultConnection") ?? "Data Source=purchases.db", "sqlite-db", tags: new[] { "database" })
+    .AddUrlGroup(new Uri(builder.Configuration["TreasuryApi:BaseUrl"] ?? "https://api.fiscal.treasury.gov"), "treasury-api-uri", tags: new[] { "external", "api" });
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -99,6 +107,42 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 
 app.UseAuthorization();
+
+// Add Health Check endpoints
+app.MapHealthChecks("/health", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    ResponseWriter = async (context, report) =>
+    {
+        context.Response.ContentType = "application/json";
+        var response = new
+        {
+            Status = report.Status.ToString(),
+            TotalDuration = report.TotalDuration.TotalMilliseconds,
+            Results = report.Entries.Select(e => new
+            {
+                Name = e.Key,
+                Status = e.Value.Status.ToString(),
+                Duration = e.Value.Duration.TotalMilliseconds,
+                Description = e.Value.Description,
+                Data = e.Value.Data,
+                Exception = e.Value.Exception?.Message,
+                Tags = e.Value.Tags
+            })
+        };
+        await context.Response.WriteAsync(System.Text.Json.JsonSerializer.Serialize(response));
+    }
+});
+
+// Individual health check endpoints
+app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("ready") || check.Tags.Contains("database")
+});
+
+app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    Predicate = _ => false // Basic liveness check
+});
 
 app.MapControllers();
 
