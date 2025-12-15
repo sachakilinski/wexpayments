@@ -31,7 +31,6 @@ public class StorePurchaseTransactionUseCaseTests
             Description = "Test Purchase",
             TransactionDate = DateTime.UtcNow,
             Amount = 100.50m,
-            Currency = "USD",
             IdempotencyKey = null
         };
 
@@ -73,7 +72,6 @@ public class StorePurchaseTransactionUseCaseTests
             Description = "Test Purchase",
             TransactionDate = DateTime.UtcNow,
             Amount = 100.50m,
-            Currency = "USD",
             IdempotencyKey = "existing-key"
         };
 
@@ -97,7 +95,6 @@ public class StorePurchaseTransactionUseCaseTests
             Description = "Test Purchase",
             TransactionDate = DateTime.UtcNow,
             Amount = 100.50m,
-            Currency = "USD",
             IdempotencyKey = "test-key"
         };
 

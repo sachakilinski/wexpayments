@@ -11,6 +11,14 @@ public sealed record Money
         Currency = currency;
     }
 
+    public static Money Zero(string currency = "USD")
+    {
+        if (string.IsNullOrWhiteSpace(currency))
+            throw new ArgumentException("Currency is required", nameof(currency));
+
+        return new Money(0, currency.ToUpperInvariant());
+    }
+
     public static Money Create(decimal amount, string currency = "USD")
     {
         if (amount <= 0)

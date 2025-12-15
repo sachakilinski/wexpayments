@@ -7,6 +7,7 @@ using Polly.Retry;
 using Wex.CorporatePayments.Application.DTOs;
 using Wex.CorporatePayments.Application.Interfaces;
 using System.Text.Json.Serialization;
+using System.Globalization;
 
 namespace Wex.CorporatePayments.Infrastructure.Clients;
 
@@ -92,7 +93,7 @@ public class TreasuryApiClient : ITreasuryApiClient
             var firstRecord = treasuryResponse?.Data?.FirstOrDefault();
             if (firstRecord != null && !string.IsNullOrEmpty(firstRecord.ExchangeRate))
             {
-                if (decimal.TryParse(firstRecord.ExchangeRate, out var parsedRate))
+                if (decimal.TryParse(firstRecord.ExchangeRate, NumberStyles.Any, CultureInfo.InvariantCulture, out var parsedRate))
                 {
                     rate = parsedRate;
                 }
@@ -161,7 +162,7 @@ public class TreasuryApiClient : ITreasuryApiClient
                 .Select(d => new ExchangeRateDto
                 {
                     Currency = d.CountryCurrencyDesc,
-                    Rate = decimal.TryParse(d.ExchangeRate, out var parsedRate) ? parsedRate : 0,
+                    Rate = decimal.TryParse(d.ExchangeRate, NumberStyles.Any, CultureInfo.InvariantCulture, out var parsedRate) ? parsedRate : 0,
                     Date = DateTime.Parse(d.RecordDate),
                     RecordDate = DateTime.Parse(d.RecordDate)
                 })

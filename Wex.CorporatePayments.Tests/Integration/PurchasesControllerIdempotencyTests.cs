@@ -90,7 +90,6 @@ public class PurchasesControllerIdempotencyTests : IClassFixture<WebApplicationF
             Description = "Test Purchase",
             TransactionDate = DateTime.UtcNow,
             Amount = 100.50m,
-            Currency = "USD",
             IdempotencyKey = null
         };
 
@@ -134,7 +133,6 @@ public class PurchasesControllerIdempotencyTests : IClassFixture<WebApplicationF
             Description = "Test Purchase",
             TransactionDate = DateTime.UtcNow,
             Amount = 100.50m,
-            Currency = "USD",
             IdempotencyKey = idempotencyKey
         };
 
@@ -200,7 +198,6 @@ public class PurchasesControllerIdempotencyTests : IClassFixture<WebApplicationF
             Description = "Test Purchase 1",
             TransactionDate = DateTime.UtcNow,
             Amount = 100.50m,
-            Currency = "USD",
             IdempotencyKey = idempotencyKey1
         };
 
@@ -209,7 +206,6 @@ public class PurchasesControllerIdempotencyTests : IClassFixture<WebApplicationF
             Description = "Test Purchase 2",
             TransactionDate = DateTime.UtcNow,
             Amount = 200.75m,
-            Currency = "USD",
             IdempotencyKey = idempotencyKey2
         };
 
@@ -255,7 +251,6 @@ public class PurchasesControllerIdempotencyTests : IClassFixture<WebApplicationF
             Description = "Test Purchase",
             TransactionDate = DateTime.UtcNow,
             Amount = 100.50m,
-            Currency = "USD",
             IdempotencyKey = null
         };
 
@@ -299,7 +294,6 @@ public class PurchasesControllerIdempotencyTests : IClassFixture<WebApplicationF
             Description = "Test Purchase",
             TransactionDate = DateTime.UtcNow,
             Amount = 100.50m,
-            Currency = "USD",
             IdempotencyKey = ""
         };
 

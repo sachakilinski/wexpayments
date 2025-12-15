@@ -36,7 +36,7 @@ public class StorePurchaseTransactionUseCase : IStorePurchaseTransactionUseCase
         }
 
         // Create new purchase entity
-        var originalAmount = Money.Create(command.Amount, command.Currency);
+        var originalAmount = Money.Create(command.Amount, "USD");
         var purchase = new Purchase(
             command.Description,
             command.TransactionDate,

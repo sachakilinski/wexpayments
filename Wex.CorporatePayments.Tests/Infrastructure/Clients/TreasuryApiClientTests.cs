@@ -35,7 +35,7 @@ public class TreasuryApiClientTests
             ""data"": [
                 {
                     ""country_currency_desc"": ""BRAZIL-REAL"",
-                    ""exchange_rate"": 5.25,
+                    ""exchange_rate"": ""5.25"",
                     ""record_date"": ""2023-12-15""
                 }
             ]
@@ -272,12 +272,12 @@ public class TreasuryApiClientTests
             ""data"": [
                 {
                     ""country_currency_desc"": ""BRAZIL-REAL"",
-                    ""exchange_rate"": 5.25,
+                    ""exchange_rate"": ""5.25"",
                     ""record_date"": ""2023-12-15""
                 },
                 {
                     ""country_currency_desc"": ""BRAZIL-REAL"",
-                    ""exchange_rate"": 5.20,
+                    ""exchange_rate"": ""5.20"",
                     ""record_date"": ""2023-12-14""
                 }
             ]
@@ -315,7 +315,7 @@ public class TreasuryApiClientTests
             ""data"": [
                 {
                     ""country_currency_desc"": """ + currency.ToUpperInvariant() + @""",
-                    ""exchange_rate"": 1.25,
+                    ""exchange_rate"": ""1.25"",
                     ""record_date"": """ + expectedDateParam + @"""
                 }
             ]

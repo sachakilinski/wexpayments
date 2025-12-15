@@ -21,8 +21,8 @@ public class RetrieveConvertedPurchaseResponse
     public Guid Id { get; set; }
     public string Description { get; set; } = string.Empty;
     public DateTime TransactionDate { get; set; }
-    public Money OriginalAmount { get; set; } = Money.Create(0, "USD");
-    public Money ConvertedAmount { get; set; } = Money.Create(0, "USD");
+    public Money OriginalAmount { get; set; } = Money.Zero();
+    public Money ConvertedAmount { get; set; } = Money.Zero();
     public string ExchangeRateDate { get; set; } = string.Empty;
     public decimal ExchangeRate { get; set; }
 }

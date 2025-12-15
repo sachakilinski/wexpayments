@@ -23,8 +23,7 @@ public class StorePurchaseCommandValidatorTests
         {
             Description = "",
             TransactionDate = DateTime.Now,
-            Amount = 100,
-            Currency = "USD"
+            Amount = 100
         };
 
         // Act & Assert
@@ -40,8 +39,7 @@ public class StorePurchaseCommandValidatorTests
         {
             Description = "This is a very long description that exceeds fifty characters limit",
             TransactionDate = DateTime.Now,
-            Amount = 100,
-            Currency = "USD"
+            Amount = 100
         };
 
         // Act & Assert
@@ -57,8 +55,7 @@ public class StorePurchaseCommandValidatorTests
         {
             Description = "Valid Description",
             TransactionDate = DateTime.Now,
-            Amount = 0,
-            Currency = "USD"
+            Amount = 0
         };
 
         // Act & Assert
@@ -74,8 +71,7 @@ public class StorePurchaseCommandValidatorTests
         {
             Description = "Valid Description",
             TransactionDate = DateTime.Now,
-            Amount = -50,
-            Currency = "USD"
+            Amount = -50
         };
 
         // Act & Assert
@@ -91,8 +87,7 @@ public class StorePurchaseCommandValidatorTests
         {
             Description = "Valid Description",
             TransactionDate = default(DateTime),
-            Amount = 100,
-            Currency = "USD"
+            Amount = 100
         };
 
         // Act & Assert
@@ -109,7 +104,6 @@ public class StorePurchaseCommandValidatorTests
             Description = "Valid Description",
             TransactionDate = DateTime.Now,
             Amount = 100,
-            Currency = "USD",
             IdempotencyKey = "unique-key-123"
         };
 
@@ -126,8 +120,7 @@ public class StorePurchaseCommandValidatorTests
         {
             Description = "This description is exactly fifty chars long!",
             TransactionDate = DateTime.Now,
-            Amount = 100,
-            Currency = "USD"
+            Amount = 100
         };
 
         // Act & Assert
