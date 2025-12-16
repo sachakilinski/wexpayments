@@ -123,7 +123,6 @@ Idempotency-Key: <GUID>
 {
   "description": "Office Supplies",
   "transactionDate": "2023-12-15T14:30:00Z",
-  "amount": 150.00,
-  "currency": "USD"
+  "amount": 150.00
 }
 ```
