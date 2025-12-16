@@ -26,6 +26,7 @@ My approach was divided into clear phases to ensure correctness, scalability, an
    - Correct query string construction
    - Enforcing the **6-month historical window** requirement
    - Clear error handling when rates are missing or invalid
+   - Resilience policies (Polly) to handle external service failures
 
 4. **Idempotency Implementation**  
    Designed a safe retry mechanism to protect against duplicate transactions caused by network retries.
@@ -129,11 +130,8 @@ I followed the **Testing Pyramid** approach:
 
 Given more time, the following enhancements would further harden the system:
 
-- **Resilience Policies (Polly)**  
-  Add circuit breakers, timeouts, and exponential backoff for Treasury API calls.
-
-- **Distributed Caching (Redis)**  
-  Replace `IMemoryCache` to support horizontal scaling without cache inconsistency.
+- **Concurrency****  
+  Better handling of racing conditions, probably with locking.
 
 - **Background Processing**  
   Move transaction persistence or currency conversion to background queues  
