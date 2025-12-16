@@ -4,5 +4,5 @@ namespace Wex.CorporatePayments.Application.UseCases;
 
 public interface IStorePurchaseTransactionUseCase
 {
-    Task<Guid> HandleAsync(StorePurchaseCommand command, CancellationToken cancellationToken = default);
+    Task<Guid> HandleAsync(StorePurchaseCommand command, string? idempotencyKey = null, CancellationToken cancellationToken = default);
 }

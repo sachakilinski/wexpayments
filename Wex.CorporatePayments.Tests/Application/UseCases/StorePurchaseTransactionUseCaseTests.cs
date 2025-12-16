@@ -30,8 +30,7 @@ public class StorePurchaseTransactionUseCaseTests
         {
             Description = "Test Purchase",
             TransactionDate = DateTime.UtcNow,
-            Amount = 100.50m,
-            IdempotencyKey = null
+            Amount = 100.50m
         };
 
         _purchaseRepositoryMock
@@ -71,8 +70,7 @@ public class StorePurchaseTransactionUseCaseTests
         {
             Description = "Test Purchase",
             TransactionDate = existingPurchase.TransactionDate,
-            Amount = 100.50m,
-            IdempotencyKey = "existing-key"
+            Amount = 100.50m
         };
 
         _purchaseRepositoryMock
@@ -80,7 +78,7 @@ public class StorePurchaseTransactionUseCaseTests
             .ReturnsAsync(existingPurchase);
 
         // Act
-        var result = await _useCase.HandleAsync(command);
+        var result = await _useCase.HandleAsync(command, "existing-key");
 
         // Assert
         Assert.Equal(existingPurchaseId, result);
@@ -107,8 +105,7 @@ public class StorePurchaseTransactionUseCaseTests
         {
             Description = "Different Purchase", // Different description
             TransactionDate = DateTime.UtcNow,
-            Amount = 100.50m, // Different amount
-            IdempotencyKey = "existing-key"
+            Amount = 100.50m // Different amount
         };
 
         _purchaseRepositoryMock
@@ -116,7 +113,7 @@ public class StorePurchaseTransactionUseCaseTests
             .ReturnsAsync(existingPurchase);
 
         // Act & Assert
-        var exception = await Assert.ThrowsAsync<IdempotencyConflictException>(() => _useCase.HandleAsync(command));
+        var exception = await Assert.ThrowsAsync<IdempotencyConflictException>(() => _useCase.HandleAsync(command, "existing-key"));
         
         Assert.Equal("existing-key", exception.IdempotencyKey);
         _purchaseRepositoryMock.Verify(r => r.AddAsync(It.IsAny<Purchase>(), It.IsAny<CancellationToken>()), Times.Never);
@@ -142,8 +139,7 @@ public class StorePurchaseTransactionUseCaseTests
         {
             Description = "Test Purchase",
             TransactionDate = DateTime.UtcNow,
-            Amount = 100.50m,
-            IdempotencyKey = "test-key"
+            Amount = 100.50m
         };
 
         _purchaseRepositoryMock
@@ -164,7 +160,7 @@ public class StorePurchaseTransactionUseCaseTests
             .ReturnsAsync(existingPurchase); // Second call returns existing purchase
 
         // Act
-        var result = await _useCase.HandleAsync(command);
+        var result = await _useCase.HandleAsync(command, "test-key");
 
         // Assert
         Assert.Equal(existingPurchaseId, result);

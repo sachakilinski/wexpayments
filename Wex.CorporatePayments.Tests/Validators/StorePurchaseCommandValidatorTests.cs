@@ -103,8 +103,7 @@ public class StorePurchaseCommandValidatorTests
         {
             Description = "Valid Description",
             TransactionDate = DateTime.Now,
-            Amount = 100,
-            IdempotencyKey = "unique-key-123"
+            Amount = 100
         };
 
         // Act & Assert

@@ -16,10 +16,10 @@ public class StorePurchaseTransactionUseCase : IStorePurchaseTransactionUseCase
         _purchaseRepository = purchaseRepository;
     }
 
-    public async Task<Guid> HandleAsync(StorePurchaseCommand command, CancellationToken cancellationToken = default)
+    public async Task<Guid> HandleAsync(StorePurchaseCommand command, string? idempotencyKey = null, CancellationToken cancellationToken = default)
     {
         // Normalize empty string idempotency keys to null
-        var normalizedIdempotencyKey = string.IsNullOrEmpty(command.IdempotencyKey) ? null : command.IdempotencyKey;
+        var normalizedIdempotencyKey = string.IsNullOrEmpty(idempotencyKey) ? null : idempotencyKey;
         
         // For null idempotency keys, generate a unique GUID to avoid SQLite NULL uniqueness issues
         var effectiveIdempotencyKey = normalizedIdempotencyKey ?? $"no-key-{Guid.NewGuid()}";

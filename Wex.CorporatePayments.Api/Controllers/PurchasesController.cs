@@ -29,11 +29,11 @@ public class PurchasesController : ControllerBase
     }
 
     [HttpPost]
-    public async Task<IActionResult> CreatePurchase([FromBody] StorePurchaseCommand command, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> CreatePurchase([FromBody] StorePurchaseCommand command, [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey = null, CancellationToken cancellationToken = default)
     {
         try
         {
-            var purchaseId = await _storePurchaseTransactionUseCase.HandleAsync(command, cancellationToken);
+            var purchaseId = await _storePurchaseTransactionUseCase.HandleAsync(command, idempotencyKey, cancellationToken);
             return CreatedAtAction(nameof(GetPurchase), new { id = purchaseId }, new { Id = purchaseId });
         }
         catch (ValidationException ex)

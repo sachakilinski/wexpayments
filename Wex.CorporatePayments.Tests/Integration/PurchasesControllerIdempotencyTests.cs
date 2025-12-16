@@ -89,8 +89,7 @@ public class PurchasesControllerIdempotencyTests : IClassFixture<WebApplicationF
         {
             Description = "Test Purchase",
             TransactionDate = DateTime.UtcNow,
-            Amount = 100.50m,
-            IdempotencyKey = null
+            Amount = 100.50m
         };
 
         var json = JsonSerializer.Serialize(command);
@@ -132,15 +131,21 @@ public class PurchasesControllerIdempotencyTests : IClassFixture<WebApplicationF
         {
             Description = "Test Purchase",
             TransactionDate = DateTime.UtcNow,
-            Amount = 100.50m,
-            IdempotencyKey = idempotencyKey
+            Amount = 100.50m
         };
 
         var json = JsonSerializer.Serialize(command);
         var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+        
+        // Add Idempotency-Key header
+        var request = new HttpRequestMessage(HttpMethod.Post, "/api/purchases")
+        {
+            Content = content
+        };
+        request.Headers.Add("Idempotency-Key", idempotencyKey);
 
         // Act - First request should succeed
-        var firstResponse = await client.PostAsync("/api/purchases", content);
+        var firstResponse = await client.SendAsync(request);
         
         // Assert - First request should return 201
         Assert.Equal(System.Net.HttpStatusCode.Created, firstResponse.StatusCode);
@@ -163,7 +168,12 @@ public class PurchasesControllerIdempotencyTests : IClassFixture<WebApplicationF
         // Only verify status code for integration tests
 
         // Act - Second request with identical content should return 201 (idempotent)
-        var secondResponse = await client.PostAsync("/api/purchases", content);
+        var secondRequest = new HttpRequestMessage(HttpMethod.Post, "/api/purchases")
+        {
+            Content = content
+        };
+        secondRequest.Headers.Add("Idempotency-Key", idempotencyKey);
+        var secondResponse = await client.SendAsync(secondRequest);
 
         // Assert - Second request should return 201 (idempotent success)
         Assert.Equal(System.Net.HttpStatusCode.Created, secondResponse.StatusCode);
@@ -196,15 +206,21 @@ public class PurchasesControllerIdempotencyTests : IClassFixture<WebApplicationF
         {
             Description = "Test Purchase",
             TransactionDate = DateTime.UtcNow,
-            Amount = 100.50m,
-            IdempotencyKey = idempotencyKey
+            Amount = 100.50m
         };
 
         var firstJson = JsonSerializer.Serialize(firstCommand);
         var firstContent = new StringContent(firstJson, System.Text.Encoding.UTF8, "application/json");
+        
+        // Add Idempotency-Key header
+        var firstRequest = new HttpRequestMessage(HttpMethod.Post, "/api/purchases")
+        {
+            Content = firstContent
+        };
+        firstRequest.Headers.Add("Idempotency-Key", idempotencyKey);
 
         // Act - First request should succeed
-        var firstResponse = await client.PostAsync("/api/purchases", firstContent);
+        var firstResponse = await client.SendAsync(firstRequest);
         
         // Assert - First request should return 201
         Assert.Equal(System.Net.HttpStatusCode.Created, firstResponse.StatusCode);
@@ -228,15 +244,21 @@ public class PurchasesControllerIdempotencyTests : IClassFixture<WebApplicationF
         {
             Description = "Different Purchase", // Different description
             TransactionDate = DateTime.UtcNow,
-            Amount = 200.75m, // Different amount
-            IdempotencyKey = idempotencyKey // Same idempotency key
+            Amount = 200.75m // Different amount
         };
 
         var secondJson = JsonSerializer.Serialize(secondCommand);
         var secondContent = new StringContent(secondJson, System.Text.Encoding.UTF8, "application/json");
+        
+        // Add Idempotency-Key header
+        var secondRequest = new HttpRequestMessage(HttpMethod.Post, "/api/purchases")
+        {
+            Content = secondContent
+        };
+        secondRequest.Headers.Add("Idempotency-Key", idempotencyKey);
 
         // Act - Second request with different content should return 409
-        var secondResponse = await client.PostAsync("/api/purchases", secondContent);
+        var secondResponse = await client.SendAsync(secondRequest);
 
         // Assert - Second request should return 409 (conflict)
         Assert.Equal(System.Net.HttpStatusCode.Conflict, secondResponse.StatusCode);
@@ -272,26 +294,37 @@ public class PurchasesControllerIdempotencyTests : IClassFixture<WebApplicationF
         {
             Description = "Test Purchase 1",
             TransactionDate = DateTime.UtcNow,
-            Amount = 100.50m,
-            IdempotencyKey = idempotencyKey1
+            Amount = 100.50m
         };
 
         var command2 = new StorePurchaseCommand
         {
             Description = "Test Purchase 2",
             TransactionDate = DateTime.UtcNow,
-            Amount = 200.75m,
-            IdempotencyKey = idempotencyKey2
+            Amount = 200.75m
         };
 
         var json1 = JsonSerializer.Serialize(command1);
         var json2 = JsonSerializer.Serialize(command2);
         var content1 = new StringContent(json1, System.Text.Encoding.UTF8, "application/json");
         var content2 = new StringContent(json2, System.Text.Encoding.UTF8, "application/json");
+        
+        // Create requests with different Idempotency-Key headers
+        var request1 = new HttpRequestMessage(HttpMethod.Post, "/api/purchases")
+        {
+            Content = content1
+        };
+        request1.Headers.Add("Idempotency-Key", idempotencyKey1);
+        
+        var request2 = new HttpRequestMessage(HttpMethod.Post, "/api/purchases")
+        {
+            Content = content2
+        };
+        request2.Headers.Add("Idempotency-Key", idempotencyKey2);
 
         // Act
-        var response1 = await client.PostAsync("/api/purchases", content1);
-        var response2 = await client.PostAsync("/api/purchases", content2);
+        var response1 = await client.SendAsync(request1);
+        var response2 = await client.SendAsync(request2);
 
         // Assert
         Assert.Equal(System.Net.HttpStatusCode.Created, response1.StatusCode);
@@ -325,8 +358,7 @@ public class PurchasesControllerIdempotencyTests : IClassFixture<WebApplicationF
         {
             Description = "Test Purchase",
             TransactionDate = DateTime.UtcNow,
-            Amount = 100.50m,
-            IdempotencyKey = null
+            Amount = 100.50m
         };
 
         var json = JsonSerializer.Serialize(command);
@@ -368,12 +400,13 @@ public class PurchasesControllerIdempotencyTests : IClassFixture<WebApplicationF
         {
             Description = "Test Purchase",
             TransactionDate = DateTime.UtcNow,
-            Amount = 100.50m,
-            IdempotencyKey = ""
+            Amount = 100.50m
         };
 
         var json = JsonSerializer.Serialize(command);
         var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+        
+        // Don't add Idempotency-Key header for this test (empty key)
 
         // Act
         var response1 = await client.PostAsync("/api/purchases", content);
